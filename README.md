@@ -45,6 +45,124 @@ big-bang rewrite commits.
 | 6 | ✅ | Workspace profiles (per-persona flake outputs) |
 | 7 | ✅ | Doctor + rollback + CI (`nix flake check`) |
 
+## Installation
+
+These steps take a machine with nothing on it to a working
+`home-manager switch --flake .#default` (Fish, oh-my-posh, direnv, git,
+`specify`/`backlog`/`doctor`/the ported scripts, all on `PATH`). **Debian
+is this project's reference/default distro** — the commands below are
+written for Debian (12 "bookworm" or newer) or Debian-derivatives
+(Ubuntu, etc.); adjust the one `apt` line for a non-Debian base if you're
+not on one.
+
+The steps are identical whether Debian is running under WSL2, inside a
+VM, or directly on bare metal — Nix itself doesn't care. Each target
+below only calls out what's actually different for it.
+
+### 1. Prerequisites (all targets)
+
+```console
+$ sudo apt update && sudo apt install -y curl git
+```
+
+### 2. Install Nix
+
+Prefer the **multi-user (daemon) install** — it needs `systemd`, which a
+normal VM or bare-metal Debian install already has:
+
+```console
+$ sh <(curl -L https://nixos.org/nix/install) --daemon
+```
+
+Follow the installer's prompt to open a new shell (or `source
+/etc/profile.d/nix.sh`) afterward so `nix` is on `PATH`.
+
+If `systemd` genuinely isn't available (see the WSL2 note below), use
+the **single-user install** instead — this is the exact fallback this
+project's own development sandbox needed, and it's fully sufficient for
+a single-developer machine:
+
+```console
+$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+```
+
+### 3. Enable flakes (both install modes)
+
+```console
+$ mkdir -p ~/.config/nix
+$ echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+```
+
+(For a multi-user install, this can instead go in `/etc/nix/nix.conf` to
+apply for every user on the machine.)
+
+### 4. Clone this repo and do the first activation
+
+```console
+$ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git
+$ cd workspaces-host-v2
+$ nix build .#homeConfigurations.default.activationPackage
+$ ./result/activate
+```
+
+This works even before `home-manager` itself is on `PATH` — the first
+activation installs it (via `programs.home-manager.enable`), so every
+activation after this one can just be:
+
+```console
+$ home-manager switch --flake .#default
+```
+
+### 5. Verify
+
+```console
+$ doctor
+```
+
+Every check should report `PASS` (an unset git identity reports `WARN`,
+which is expected on a brand-new machine — set it via `home/git.nix`, see
+[Assumptions in the Phase 1 spec](specs/001-core-flake-home-manager/spec.md)).
+
+---
+
+### WSL2 (Windows Subsystem for Linux)
+
+1. From an elevated PowerShell on Windows: `wsl --install -d Debian`
+   (installs WSL2 itself if it isn't already, plus a Debian distro).
+2. Launch "Debian" from the Start menu and create your Unix user when
+   prompted.
+3. **Enable `systemd`** (needed for the multi-user Nix install, and for
+   `docker`/`dockerd` if you plan to build/run this flake's OCI images
+   inside WSL2 too): create or edit `/etc/wsl.conf` inside the Debian
+   shell:
+   ```console
+   $ sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+   [boot]
+   systemd=true
+   EOF
+   ```
+   Then, from PowerShell: `wsl --shutdown`, and reopen the Debian shell.
+4. Follow steps 1-5 above from inside that Debian shell.
+
+If you'd rather not touch `wsl.conf`, the single-user Nix install (step
+2's fallback above) works in WSL2 without `systemd` too.
+
+### Linux VM (any hypervisor)
+
+Any VM running Debian (via VirtualBox, UTM, Multipass, a cloud provider's
+Debian image, etc.) already has `systemd` — just follow steps 1-5 above
+with no changes. If you plan to build/run this flake's OCI images
+(`packages.<system>.oci-image*`) inside the VM, also install Docker
+(`sudo apt install -y docker.io` on Debian, or see
+[docs.docker.com](https://docs.docker.com/engine/install/debian/) for the
+upstream package).
+
+### Debian bare metal
+
+Same as the VM case — steps 1-5, no changes. This is the most direct
+path: no virtualization layer, no WSL translation layer, just Debian and
+Nix.
+
 ## Quickstart
 
 See [`specs/001-core-flake-home-manager/quickstart.md`](specs/001-core-flake-home-manager/quickstart.md)
