@@ -55,6 +55,17 @@
             homeConfig = homeConfigurationsFor.${system};
           };
         }
+        # init-firewall (iptables/ipset) declares itself unsupported on
+        # Darwin at the nixpkgs level (meta.badPlatforms), which fails
+        # *evaluation*, not just building - unlike oci-image, this pair
+        # can't even be listed as a package attribute on those systems.
+        // nixpkgs.lib.optionalAttrs (nixpkgs.lib.hasSuffix "linux" system) {
+          init-firewall = import ./pkgs/init-firewall { inherit pkgs; };
+          oci-image-sandboxed = import ./oci/sandboxed.nix {
+            inherit pkgs;
+            homeConfig = homeConfigurationsFor.${system};
+          };
+        }
       );
 
       # One home-manager profile per supported system, so `nix flake check`
