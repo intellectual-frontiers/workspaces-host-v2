@@ -1,0 +1,65 @@
+#!/bin/sh
+# mgitstatus: report git status across every repository found under one or
+# more directories - dirty working tree, unpushed commits, and repos that
+# aren't tracking any remote branch at all.
+set -eu
+
+usage() {
+    cat <<'EOF'
+Usage: mgitstatus [-d DEPTH] [DIR ...]
+
+  -d DEPTH   Maximum directory depth to search for .git dirs (default: 3)
+  DIR ...    One or more directories to scan (default: current directory)
+
+Prints one line per repository found:
+  clean            no local changes, up to date with its upstream
+  dirty            uncommitted changes present
+  ahead N          N commits not yet pushed to upstream
+  behind N         N commits not yet pulled from upstream
+  no-upstream      current branch has no configured remote tracking branch
+EOF
+}
+
+DEPTH=3
+DIRS=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -d) DEPTH="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        -*) echo "mgitstatus: unknown option: $1" >&2; usage >&2; exit 1 ;;
+        *) DIRS="$DIRS $1"; shift ;;
+    esac
+done
+[ -n "$(printf '%s' "$DIRS" | tr -d '[:space:]')" ] || DIRS="."
+
+report_repo() {
+    repo="$1"
+    branch=$(git -C "$repo" symbolic-ref --short -q HEAD || echo "(detached)")
+    status_flags=""
+
+    if [ -n "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
+        status_flags="dirty"
+    fi
+
+    upstream=$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+    if [ -z "$upstream" ]; then
+        status_flags="${status_flags:+$status_flags, }no-upstream"
+    else
+        counts=$(git -C "$repo" rev-list --left-right --count "$upstream...HEAD" 2>/dev/null || echo "0	0")
+        behind=$(printf '%s' "$counts" | cut -f1)
+        ahead=$(printf '%s' "$counts" | cut -f2)
+        [ "$ahead" != "0" ] && status_flags="${status_flags:+$status_flags, }ahead $ahead"
+        [ "$behind" != "0" ] && status_flags="${status_flags:+$status_flags, }behind $behind"
+    fi
+
+    [ -z "$status_flags" ] && status_flags="clean"
+
+    printf '%-45s [%s] %s\n' "$repo" "$branch" "$status_flags"
+}
+
+for base in $DIRS; do
+    find "$base" -maxdepth "$DEPTH" -name .git -type d 2>/dev/null | while IFS= read -r gitdir; do
+        report_repo "$(dirname "$gitdir")"
+    done
+done
