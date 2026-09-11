@@ -120,8 +120,9 @@ $ doctor
 ```
 
 Every check should report `PASS` (an unset git identity reports `WARN`,
-which is expected on a brand-new machine — set it via `home/git.nix`, see
-[Assumptions in the Phase 1 spec](specs/001-core-flake-home-manager/spec.md)).
+which is expected on a brand-new machine — override the placeholder
+identity in [`home/git.nix`](home/git.nix), see
+[the Phase 1 quickstart's "Git identity" section](specs/001-core-flake-home-manager/quickstart.md)).
 
 ---
 
