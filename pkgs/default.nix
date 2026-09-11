@@ -7,4 +7,5 @@
   specify-cli = import ./specify-cli { inherit pkgs; };
   backlog-md = import ./backlog-md { inherit pkgs; };
   scaffold-agent-harness = import ./scaffold-agent-harness { inherit pkgs; };
+  sensitivectl = import ./sensitivectl { inherit pkgs; };
 }
