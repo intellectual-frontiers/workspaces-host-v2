@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  flake-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # Builds every check/package for this runner's system (x86_64-linux)
+      # and evaluates (without building) the rest, exactly like running it
+      # locally - see specs/001-core-flake-home-manager/quickstart.md.
+      - name: nix flake check
+        run: nix flake check --all-systems -L
+
+      # Explicit build steps (on top of the check above) so reproducibility
+      # of the two OCI images specifically is CI-verified, per the Phase 7
+      # roadmap item, not just implied by the flake check passing.
+      - name: Build the OCI image (Phase 2)
+        run: nix build .#packages.x86_64-linux.oci-image -L
+
+      - name: Build the sandboxed OCI image (Phase 5)
+        run: nix build .#packages.x86_64-linux.oci-image-sandboxed -L
+
+      - name: Run doctor against a real activation
+        run: |
+          nix build .#homeConfigurations.default.activationPackage -L --no-link --print-out-paths > /tmp/gen-path
+          export HOME="$RUNNER_TEMP/hm-home"
+          mkdir -p "$HOME"
+          mkdir -p "/nix/var/nix/profiles/per-user/$(whoami)"
+          "$(cat /tmp/gen-path)/activate"
+          "$HOME/.nix-profile/bin/doctor"

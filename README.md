@@ -43,13 +43,42 @@ big-bang rewrite commits.
 | 4 | ✅ | Secrets (`sops-nix` / `op`, generalized backup/restore over `rclone`) |
 | 5 | ✅ | Agent sandboxing (network-egress allowlist) |
 | 6 | ✅ | Workspace profiles (per-persona flake outputs) |
-| 7 | ⬜ | Doctor + rollback + CI (`nix flake check`) |
+| 7 | ✅ | Doctor + rollback + CI (`nix flake check`) |
 
 ## Quickstart
 
 See [`specs/001-core-flake-home-manager/quickstart.md`](specs/001-core-flake-home-manager/quickstart.md)
 for the verified `nix flake check` / `home-manager switch --flake .#default`
 smoke test.
+
+## Health check & rollback
+
+Run `doctor` (installed by every profile) to check that Nix, the shell
+stack, git, and every ported CLI tool are actually present and working:
+
+```console
+$ doctor
+```
+
+It prints one `PASS`/`WARN`/`FAIL` line per check and exits non-zero only
+on a real failure. See
+[`specs/007-doctor-rollback-ci/quickstart.md`](specs/007-doctor-rollback-ci/quickstart.md)
+for a full transcript.
+
+Rolling back a bad change needs no extra tooling - home-manager's own
+generations are already a full history:
+
+```console
+$ home-manager generations
+2026-09-11 22:15 : id 2 -> /nix/store/...-home-manager-generation
+2026-09-11 22:15 : id 1 -> /nix/store/...-home-manager-generation
+
+$ /nix/store/...-home-manager-generation/activate   # re-activate an older one
+```
+
+This is a real, verified rollback (a two-generation activate/rollback
+cycle was exercised during Phase 7's implementation), not a theoretical
+capability - see the same quickstart for the full before/after transcript.
 
 ## Working style
 
