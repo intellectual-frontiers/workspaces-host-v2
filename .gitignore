@@ -1,0 +1,17 @@
+# Nix
+result
+result-*
+.direnv/
+
+# Spec Kit machine-local state
+.specify/feature.json
+.specify/extensions/*/local-config.yml
+
+# OS/editor cruft
+.DS_Store
+*.swp
+
+# Agent folder security: avoid committing credentials/auth tokens some
+# agents may cache locally under .claude/.
+.claude/settings.local.json
+.claude/*.local.json
