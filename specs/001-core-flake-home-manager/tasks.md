@@ -21,11 +21,11 @@ verification gates in place of unit tests.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create `flake.nix` with `inputs` for `nixpkgs`, `home-manager`,
+- [x] T001 Create `flake.nix` with `inputs` for `nixpkgs`, `home-manager`,
       and `flake-utils`, and an empty `outputs` function wired through
       `flake-utils.lib.eachDefaultSystem`
-- [ ] T002 Run `nix flake lock` to generate `flake.lock` pinning all three inputs
-- [ ] T003 [P] Create `home/`, `pkgs/`, and `themes/oh-my-posh/` directories per plan.md's structure
+- [x] T002 Run `nix flake lock` to generate `flake.lock` pinning all three inputs
+- [x] T003 [P] Create `home/`, `pkgs/`, and `themes/oh-my-posh/` directories per plan.md's structure
 
 **Checkpoint**: `nix flake metadata` resolves the flake with no errors
 
@@ -37,15 +37,15 @@ verification gates in place of unit tests.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Add `home-manager` as a proper flake input (`inputs.home-manager.url`,
+- [x] T004 Add `home-manager` as a proper flake input (`inputs.home-manager.url`,
       `inputs.home-manager.inputs.nixpkgs.follows = "nixpkgs"`) in `flake.nix`
-- [ ] T005 Create `home/default.nix` as the top-level home-manager module stub
+- [x] T005 Create `home/default.nix` as the top-level home-manager module stub
       (declares `home.stateVersion`, `home.username`, `home.homeDirectory`,
       and `imports = [ ./shell.nix ./direnv.nix ./git.nix ]`)
-- [ ] T006 Wire `homeConfigurations.default` in `flake.nix`, using
+- [x] T006 Wire `homeConfigurations.default` in `flake.nix`, using
       `home-manager.lib.homeManagerConfiguration` with `modules = [ ./home/default.nix ]`,
       for each system in `eachDefaultSystem`
-- [ ] T007 Add a `checks.<system>.default` output in `flake.nix` that builds
+- [x] T007 Add a `checks.<system>.default` output in `flake.nix` that builds
       `homeConfigurations.default.activationPackage`, so `nix flake check`
       exercises the whole module
 
@@ -61,14 +61,14 @@ verification gates in place of unit tests.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Create `themes/oh-my-posh/default.omp.json` with a documented default theme
-- [ ] T009 [P] [US1] Implement `home/shell.nix`: `programs.fish.enable = true`,
+- [x] T008 [P] [US1] Create `themes/oh-my-posh/default.omp.json` with a documented default theme
+- [x] T009 [P] [US1] Implement `home/shell.nix`: `programs.fish.enable = true`,
       set as the module's shell, `programs.oh-my-posh.enable = true` pointed at
       `themes/oh-my-posh/default.omp.json`, Fish init hook to source oh-my-posh
-- [ ] T010 [US1] Implement `home/direnv.nix`: `programs.direnv.enable = true`,
+- [x] T010 [US1] Implement `home/direnv.nix`: `programs.direnv.enable = true`,
       `programs.direnv.nix-direnv.enable = true`, `programs.direnv.enableFishIntegration = true`
-- [ ] T011 [US1] Import `shell.nix` and `direnv.nix` from `home/default.nix` (if not already wired in T005)
-- [ ] T012 [US1] Write `specs/001-core-flake-home-manager/quickstart.md` documenting the
+- [x] T011 [US1] Import `shell.nix` and `direnv.nix` from `home/default.nix` (if not already wired in T005)
+- [x] T012 [US1] Write `specs/001-core-flake-home-manager/quickstart.md` documenting the
       `home-manager switch --flake .#default` smoke test steps and expected observations
       (Fish prompt visible, `direnv status` output) for manual verification
 
@@ -84,15 +84,15 @@ verification gates in place of unit tests.
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Implement `home/git.nix`: expose `programs.git.enable`,
+- [x] T013 [US2] Implement `home/git.nix`: expose `programs.git.enable`,
       `programs.git.userName`, `programs.git.userEmail` (surfaced as this
       profile's declarative identity options), plus `programs.git.aliases`
       and safe defaults (`init.defaultBranch = "main"`, `pull.rebase = true`,
       etc.)
-- [ ] T014 [US2] Import `git.nix` from `home/default.nix` and set placeholder/
+- [x] T014 [US2] Import `git.nix` from `home/default.nix` and set placeholder/
       example identity values in `flake.nix`'s `homeConfigurations.default`
       module arguments (documented as "override per-user" in quickstart.md)
-- [ ] T015 [US2] Extend `specs/001-core-flake-home-manager/quickstart.md` with
+- [x] T015 [US2] Extend `specs/001-core-flake-home-manager/quickstart.md` with
       the git-identity verification steps (`git config --get user.name`, etc.)
 
 **Checkpoint**: User Stories 1 and 2 both pass their independent tests
@@ -107,18 +107,18 @@ verification gates in place of unit tests.
 
 ### Implementation for User Story 3
 
-- [ ] T016 [P] [US3] Write `pkgs/semtag/semtag` (POSIX sh) and
+- [x] T016 [P] [US3] Write `pkgs/semtag/semtag` (POSIX sh) and
       `pkgs/semtag/default.nix` (a `writeShellApplication`/`stdenv.mkDerivation`
       packaging it)
-- [ ] T017 [P] [US3] Write `pkgs/mgitstatus/mgitstatus` and `pkgs/mgitstatus/default.nix`
-- [ ] T018 [P] [US3] Write `pkgs/git-standup/git-standup` and `pkgs/git-standup/default.nix`
-- [ ] T019 [US3] Create `pkgs/default.nix` aggregating the three derivations,
+- [x] T017 [P] [US3] Write `pkgs/mgitstatus/mgitstatus` and `pkgs/mgitstatus/default.nix`
+- [x] T018 [P] [US3] Write `pkgs/git-standup/git-standup` and `pkgs/git-standup/default.nix`
+- [x] T019 [US3] Create `pkgs/default.nix` aggregating the three derivations,
       keyed by name, for reuse from both `packages.<system>` and `home.packages`
-- [ ] T020 [US3] Expose the three packages via `packages.<system>` in `flake.nix`
+- [x] T020 [US3] Expose the three packages via `packages.<system>` in `flake.nix`
       (depends on T016-T019)
-- [ ] T021 [US3] Add the three packages to `home.packages` in `home/default.nix`
+- [x] T021 [US3] Add the three packages to `home.packages` in `home/default.nix`
       (or a new `home/tools.nix` imported from it) so they land on `PATH` after activation
-- [ ] T022 [US3] Extend `quickstart.md` with the `which semtag mgitstatus git-standup`
+- [x] T022 [US3] Extend `quickstart.md` with the `which semtag mgitstatus git-standup`
       verification step
 
 **Checkpoint**: All three user stories pass their independent tests
@@ -127,10 +127,10 @@ verification gates in place of unit tests.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T023 [P] Add a top-level `## Quickstart` link from `README.md` to
+- [x] T023 [P] Add a top-level `## Quickstart` link from `README.md` to
       `specs/001-core-flake-home-manager/quickstart.md`
-- [ ] T024 Run `nix flake check` and resolve any evaluation/build errors across all modules and packages
-- [ ] T025 Run the full `quickstart.md` smoke test end-to-end on a scratch `$HOME` and record the result in the PR description
+- [x] T024 Run `nix flake check` and resolve any evaluation/build errors across all modules and packages
+- [x] T025 Run the full `quickstart.md` smoke test end-to-end on a scratch `$HOME` and record the result in the PR description
 
 ---
 
