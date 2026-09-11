@@ -51,4 +51,11 @@ jobs:
           # (root, single-user install), where a plain mkdir sufficed.
           sudo install -d -o "$(id -un)" -g "$(id -gn)" "/nix/var/nix/profiles/per-user/$USER"
           "$(cat /tmp/gen-path)/activate"
-          "$HOME/.nix-profile/bin/doctor"
+          # Activation installs everything into ~/.nix-profile, but doesn't
+          # itself change this shell's PATH (that normally happens via a
+          # new login shell, or by sourcing
+          # ~/.nix-profile/etc/profile.d/hm-session-vars.sh - same manual
+          # PATH prefix used for every local activation in this project's
+          # own development sandbox).
+          export PATH="$HOME/.nix-profile/bin:$PATH"
+          doctor
