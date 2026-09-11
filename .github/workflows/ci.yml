@@ -36,6 +36,13 @@ jobs:
           nix build .#homeConfigurations.default.activationPackage -L --no-link --print-out-paths > /tmp/gen-path
           export HOME="$RUNNER_TEMP/hm-home"
           mkdir -p "$HOME"
-          mkdir -p "/nix/var/nix/profiles/per-user/$(whoami)"
+          # Under cachix/install-nix-action's multi-user (daemon) install,
+          # /nix/var/nix/profiles/per-user isn't writable by the unprivileged
+          # `runner` user directly - unlike this project's own dev sandbox
+          # (root, single-user install), where a plain mkdir sufficed.
+          # GitHub-hosted runners have passwordless sudo, so use that to
+          # create this user's per-user profile directory with correct
+          # ownership rather than guessing whether the daemon creates it.
+          sudo install -d -o "$(whoami)" -g "$(id -gn)" "/nix/var/nix/profiles/per-user/$(whoami)"
           "$(cat /tmp/gen-path)/activate"
           "$HOME/.nix-profile/bin/doctor"
