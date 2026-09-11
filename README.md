@@ -38,7 +38,7 @@ big-bang rewrite commits.
 |---|---|---|
 | 0 | ✅ | Bootstrap: Spec Kit, constitution |
 | 1 | ✅ | Core flake: `flake.nix` + home-manager module (fish, oh-my-posh, direnv/nix-direnv, git config, core CLI toolset) |
-| 2 | ⬜ | Container/OCI parity |
+| 2 | ✅ | Container/OCI parity |
 | 3 | ⬜ | Agent-harness scaffolding (`.claude/`, `AGENTS.md`, MCP registry, skills convention) |
 | 4 | ⬜ | Secrets (`sops-nix` / `op`, generalized backup/restore over `rclone`) |
 | 5 | ⬜ | Agent sandboxing (network-egress allowlist) |
