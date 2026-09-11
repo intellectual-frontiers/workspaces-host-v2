@@ -1,5 +1,5 @@
 {
-  description = "Workspaces Host v2 - core flake: home-manager module (fish, oh-my-posh, direnv, git), ported CLI tools, and an OCI image built from the same closure";
+  description = "Workspaces Host v2 - core flake: home-manager module (fish, oh-my-posh, direnv, git), ported CLI tools, per-persona profiles, and an OCI image built from the same closure";
 
   inputs = {
     nixpkgs.url = "git+https://github.com/NixOS/nixpkgs?ref=nixos-24.11&shallow=1";
@@ -19,11 +19,22 @@
       forAllSystems = nixpkgs.lib.genAttrs systems;
       pkgsFor = system: import nixpkgs { inherit system; };
 
-      mkHomeConfiguration = system:
+      # Per-persona profiles (Phase 6): each adds a small, focused package
+      # set on top of the shared base (home/) - replacing the old repo's
+      # single global Homebrew package list with composable slices.
+      personaModules = {
+        backend = ./home/profiles/backend.nix;
+        data = ./home/profiles/data.nix;
+        mobile = ./home/profiles/mobile.nix;
+        agent-ops = ./home/profiles/agent-ops.nix;
+      };
+
+      mkHomeConfiguration = system: extraModules:
         home-manager.lib.homeManagerConfiguration {
           pkgs = pkgsFor system;
           modules = [
             ./home
+          ] ++ extraModules ++ [
             {
               # Example/default identity - override per-user by forking
               # this module set; see quickstart.md.
@@ -41,7 +52,16 @@
       # `checks` all build the OCI image and the activation package from
       # the exact same evaluated home-manager config (Constitution
       # Principle IV: host and container share one closure).
-      homeConfigurationsFor = forAllSystems mkHomeConfiguration;
+      homeConfigurationsFor = forAllSystems (system: mkHomeConfiguration system [ ]);
+
+      # Persona configurations are pinned to x86_64-linux, same rationale
+      # as `default` below: engineers on another platform substitute that
+      # system's own attribute (or fork a persona module for their
+      # platform) rather than this flake enumerating every
+      # persona x system combination up front.
+      personaConfigurations = nixpkgs.lib.mapAttrs
+        (_name: modulePath: mkHomeConfiguration "x86_64-linux" [ modulePath ])
+        personaModules;
     in
     {
       packages = forAllSystems (system:
@@ -72,8 +92,10 @@
       # and CI can build every platform. `default` aliases the profile for
       # this repo's primary target (x86_64-linux); engineers on another
       # platform use that system's own name instead of `default`
-      # (see specs/001-core-flake-home-manager/quickstart.md).
-      homeConfigurations = homeConfigurationsFor // {
+      # (see specs/001-core-flake-home-manager/quickstart.md). The named
+      # persona profiles (backend/data/mobile/agent-ops - Phase 6) layer a
+      # focused extra package set on top of that same base.
+      homeConfigurations = homeConfigurationsFor // personaConfigurations // {
         default = homeConfigurationsFor.x86_64-linux;
       };
 

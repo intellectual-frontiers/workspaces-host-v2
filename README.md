@@ -42,7 +42,7 @@ big-bang rewrite commits.
 | 3 | ✅ | Agent-harness scaffolding (`.claude/`, `AGENTS.md`, MCP registry, skills convention) |
 | 4 | ✅ | Secrets (`sops-nix` / `op`, generalized backup/restore over `rclone`) |
 | 5 | ✅ | Agent sandboxing (network-egress allowlist) |
-| 6 | ⬜ | Workspace profiles (per-persona flake outputs) |
+| 6 | ✅ | Workspace profiles (per-persona flake outputs) |
 | 7 | ⬜ | Doctor + rollback + CI (`nix flake check`) |
 
 ## Quickstart
