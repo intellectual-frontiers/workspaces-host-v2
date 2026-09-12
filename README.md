@@ -322,6 +322,41 @@ Example `my.mgit.code-workspace`, checked into a repo `mgit` manages:
 }
 ```
 
+## PostgreSQL credentials (`~/.pgpass`, `~/.psqlrc`, `pgpass`)
+
+Every profile ships `~/.psqlrc` (a full `psql` client config - colored
+prompt, sane defaults, and a set of `\set` admin queries like `settings`,
+`locks`, `dbsize`, `tablesize`) and bootstraps an empty `~/.pgpass` (mode
+`600`, as `libpq` requires or it silently ignores the file) on first
+activation - both ported from the original repo, `.pgpass` deliberately
+left for you to fill in rather than generated with real credentials.
+
+Add connections to `~/.pgpass` using a small comment-header convention -
+one JSON-like descriptor line before each `hostname:port:database:username:password`
+line:
+
+```console
+$ cat ~/.pgpass
+# { id: "MYDB", description: "Purpose", boundary: "Network" }
+192.168.2.24:5432:pgDB_name:pgDB_username:sup3rSecure!
+```
+
+Then look connections up by `id` with the `pgpass` command (a native port
+of `netspective-labs/sql-aide`'s `pgpass.ts`, covering its most-used
+subcommands):
+
+```console
+$ pgpass ls                                    # list every connection's id/description/host
+$ pgpass test                                  # validate the file, reporting any parse issues
+$ eval "$(pgpass env --conn-id=MYDB)"          # export PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD
+$ eval "$(pgpass psql --conn-id=MYDB)"         # runs "psql -h ... -p ... -d ... -U ..." for MYDB
+$ pgpass url --conn-id=MYDB                    # postgres://user:pass@host:port/db
+```
+
+`--conn-id` takes an extended regex, so `--conn-id=".*"` matches every
+connection (useful with `env` to export every connection's variables at
+once, prefixed by each connection's own `id`).
+
 ## Health check & rollback
 
 Run `doctor` (installed by every profile) to check that Nix, the shell

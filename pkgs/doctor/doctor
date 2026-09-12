@@ -67,7 +67,7 @@ fi
 
 echo
 echo "-- Ported CLI tools (home.packages) --"
-for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl; do
+for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl pgpass; do
     check_cmd "$c"
 done
 
@@ -82,6 +82,24 @@ if [ -d "$HOME/workspaces" ]; then
     fi
 else
     warn "~/workspaces does not exist yet (did home-manager switch run?)"
+fi
+
+echo
+echo "-- PostgreSQL credentials (~/.pgpass, ~/.psqlrc) --"
+if [ -f "$HOME/.pgpass" ]; then
+    perm=$(stat -c '%a' "$HOME/.pgpass" 2>/dev/null || stat -f '%Lp' "$HOME/.pgpass" 2>/dev/null || echo '?')
+    if [ "$perm" = "600" ]; then
+        pass "~/.pgpass exists with mode 600 (edit it to add connections, then use 'pgpass')"
+    else
+        warn "~/.pgpass exists but mode is $perm, not 600 (libpq/psql may ignore it - chmod 600 ~/.pgpass)"
+    fi
+else
+    warn "~/.pgpass not found (did home-manager switch run?)"
+fi
+if [ -f "$HOME/.psqlrc" ]; then
+    pass "~/.psqlrc exists"
+else
+    warn "~/.psqlrc not found (did home-manager switch run?)"
 fi
 
 echo
