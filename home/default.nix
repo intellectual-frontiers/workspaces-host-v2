@@ -7,6 +7,7 @@
     ./git.nix
     ./tools.nix
     ./secrets.nix
+    ./fonts.nix
   ];
 
   # home.username, home.homeDirectory, and home.stateVersion are supplied by
