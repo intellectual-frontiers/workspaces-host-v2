@@ -3,10 +3,11 @@
 {
   # Where workspaces-host-v2 itself is cloned - used by
   # `workspaces-host-update` and the daily upstream-check nudge below.
-  # Override this (e.g. in a fork, or via `home.sessionVariables` in a
-  # wrapping module) if you cloned it somewhere other than
-  # ~/workspaces-host-v2 (see README's install steps).
-  home.sessionVariables.WORKSPACES_HOST_REPO = "${config.home.homeDirectory}/workspaces-host-v2";
+  # Dotted (~/.workspaces-host-v2) so it stays out of the way of a plain
+  # `ls`/directory listing in $HOME. Override this (e.g. in a fork, or
+  # via `home.sessionVariables` in a wrapping module) if you cloned it
+  # somewhere else (see README's install steps).
+  home.sessionVariables.WORKSPACES_HOST_REPO = "${config.home.homeDirectory}/.workspaces-host-v2";
 
   programs.fish = {
     enable = true;

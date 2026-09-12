@@ -118,13 +118,16 @@ titled "Debian"), except step 1.
    ```
 7. **Download and apply this setup:**
    ```console
-   $ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/workspaces-host-v2
-   $ cd ~/workspaces-host-v2
+   $ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/.workspaces-host-v2
+   $ cd ~/.workspaces-host-v2
    $ nix build .#homeConfigurations.default.activationPackage
    $ ./result/activate
    ```
    This downloads everything the setup needs and can take a few minutes
-   the first time - that's expected.
+   the first time - that's expected. The leading `.` in
+   `.workspaces-host-v2` just keeps it out of a plain `ls` of your home
+   folder - it's a completely normal folder otherwise, and `cd
+   ~/.workspaces-host-v2` gets you there any time.
 8. **Check that it worked:**
    ```console
    $ doctor
@@ -451,7 +454,7 @@ doesn't pick those up by itself; here's how to stay current.
 ### The manual way (always works)
 
 ```console
-$ cd ~/workspaces-host-v2   # or wherever $WORKSPACES_HOST_REPO points
+$ cd ~/.workspaces-host-v2   # or wherever $WORKSPACES_HOST_REPO points
 $ git pull
 $ home-manager switch --flake .#default   # or your profile
 ```
@@ -467,7 +470,7 @@ $ workspaces-host-update
 It reads two environment variables (both have sane defaults, override
 either in a fork or via `home.sessionVariables` if you need to):
 
-- `WORKSPACES_HOST_REPO` (default `~/workspaces-host-v2`) - where this
+- `WORKSPACES_HOST_REPO` (default `~/.workspaces-host-v2`) - where this
   repo is cloned.
 - `WORKSPACES_HOST_PROFILE` (default `default`) - which flake profile to
   switch to (`default`, or a persona like `backend`).
@@ -499,7 +502,7 @@ the next time you sync (see "Keeping your sandbox in sync" above).
 Change your name/email here instead, with one command:
 
 ```console
-$ sed -i 's/Workspace Engineer/Your Name/; s/workspace@example.invalid/you@example.com/' ~/workspaces-host-v2/home/git.nix
+$ sed -i 's/Workspace Engineer/Your Name/; s/workspace@example.invalid/you@example.com/' ~/.workspaces-host-v2/home/git.nix
 $ workspaces-host-update
 ```
 

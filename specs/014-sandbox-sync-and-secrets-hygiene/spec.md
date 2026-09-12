@@ -100,7 +100,7 @@ only inside that directory.
 ### Functional Requirements
 
 - **FR-001**: Every profile MUST set `WORKSPACES_HOST_REPO` (default
-  `~/workspaces-host-v2`) via `home.sessionVariables`.
+  `~/.workspaces-host-v2`) via `home.sessionVariables`.
 - **FR-002**: A new `workspaces-host-update` package MUST `git pull
   --ff-only` `$WORKSPACES_HOST_REPO` and then run `home-manager switch
   --flake $WORKSPACES_HOST_REPO#${WORKSPACES_HOST_PROFILE:-default}`,
@@ -138,7 +138,7 @@ only inside that directory.
 
 ## Assumptions
 
-- `~/workspaces-host-v2` becomes this project's own documented clone-path
+- `~/.workspaces-host-v2` becomes this project's own documented clone-path
   convention going forward (README's clone step now says so explicitly);
   engineers who already cloned elsewhere override
   `home.sessionVariables.WORKSPACES_HOST_REPO` rather than being forced to

@@ -17,7 +17,7 @@ description: "Task list for Sandbox Sync & Secrets Hygiene"
 - [x] T002 [US1] Create `pkgs/workspaces-host-update/default.nix`, register
       in `pkgs/default.nix`
 - [x] T003 [US1] Add `home.sessionVariables.WORKSPACES_HOST_REPO` (default
-      `~/workspaces-host-v2`) to `home/shell.nix`
+      `~/.workspaces-host-v2`) to `home/shell.nix`
 - [x] T004 [US1] Add the once-a-day backgrounded nudge to `home/shell.nix`'s
       `interactiveShellInit` (stamp file under `$XDG_STATE_HOME/workspaces-host/`,
       background `git fetch` + `rev-list --count`, silent on any failure)
@@ -26,7 +26,7 @@ description: "Task list for Sandbox Sync & Secrets Hygiene"
       against the generated `config.fish` passes
 - [x] T006 [US1] Verify for real (not just syntax-checked): a local bare
       "origin" one commit ahead of a clone at the default
-      `~/workspaces-host-v2` path triggers the nudge in a real interactive
+      `~/.workspaces-host-v2` path triggers the nudge in a real interactive
       fish shell exactly once, is silent on a same-day second shell, and
       `workspaces-host-update` correctly fast-forwards the clone
 - [x] T007 [US1] Add `$WORKSPACES_HOST_REPO` check to `pkgs/doctor/doctor`
@@ -50,7 +50,7 @@ a real token in a config file"
 ## Phase 3: Polish
 
 - [x] T010 Update README's clone step to standardize on
-      `~/workspaces-host-v2` (matching `WORKSPACES_HOST_REPO`'s default),
+      `~/.workspaces-host-v2` (matching `WORKSPACES_HOST_REPO`'s default),
       noting the override for engineers already cloned elsewhere
 - [x] T011 Write README's "Keeping your sandbox in sync" section: manual
       steps, `workspaces-host-update`, the nudge's behavior/guarantees

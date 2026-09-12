@@ -5,7 +5,7 @@
 # home-manager switch --flake ...".
 set -eu
 
-REPO="${WORKSPACES_HOST_REPO:-$HOME/workspaces-host-v2}"
+REPO="${WORKSPACES_HOST_REPO:-$HOME/.workspaces-host-v2}"
 PROFILE="${WORKSPACES_HOST_PROFILE:-default}"
 
 if [ ! -d "$REPO/.git" ]; then
