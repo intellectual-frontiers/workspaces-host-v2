@@ -17,7 +17,14 @@
       # transitive fetch for a handful of lines of boilerplate.
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-      pkgsFor = system: import nixpkgs { inherit system; };
+      # cnquery (home/tools.nix, compliance/observability tooling) is the
+      # only unfree package this flake pulls in (nixpkgs marks it `bsl11`)
+      # - allowed by name rather than a blanket `allowUnfree = true` so a
+      # future unfree package doesn't slip in unnoticed.
+      pkgsFor = system: import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "cnquery" ];
+      };
 
       # Per-persona profiles (Phase 6): each adds a small, focused package
       # set on top of the shared base (home/) - replacing the old repo's

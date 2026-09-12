@@ -85,6 +85,22 @@ else
 fi
 
 echo
+echo "-- Compliance & observability tooling --"
+if [ "$(uname -s)" = "Linux" ]; then
+    check_cmd osqueryi "osquery (osqueryi)"
+else
+    warn "osquery is Linux-only (nixpkgs meta.platforms) - not installed on $(uname -s)"
+fi
+check_cmd cnquery
+check_cmd steampipe
+check_cmd openobserve
+if command -v surveilr >/dev/null 2>&1; then
+    pass "surveilr is on PATH ($(command -v surveilr))"
+else
+    warn "surveilr is not on PATH (upstream only publishes x86_64-linux/x86_64-darwin release binaries - see pkgs/surveilr)"
+fi
+
+echo
 echo "-- PostgreSQL credentials (~/.pgpass, ~/.psqlrc) --"
 if [ -f "$HOME/.pgpass" ]; then
     perm=$(stat -c '%a' "$HOME/.pgpass" 2>/dev/null || stat -f '%Lp' "$HOME/.pgpass" 2>/dev/null || echo '?')

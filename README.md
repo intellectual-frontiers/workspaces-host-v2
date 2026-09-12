@@ -47,6 +47,7 @@ big-bang rewrite commits.
 | 8 | ✅ | Ported the original repo's exact oh-my-posh theme (`coach.omp.json`) byte-for-byte |
 | 9 | ✅ | Nerd Font support (installed font + human font-selection instructions) |
 | 10 | ✅ | Workspace repo management (`mgit`, `~/workspaces`) - native port of `strategy-coach/workspaces` |
+| 11 | ✅ | Compliance & observability tooling (`osquery`, `cnquery`, `steampipe`, `OpenObserve`, `surveilr`) |
 
 ## Installation
 
@@ -356,6 +357,49 @@ $ pgpass url --conn-id=MYDB                    # postgres://user:pass@host:port/
 `--conn-id` takes an extended regex, so `--conn-id=".*"` matches every
 connection (useful with `env` to export every connection's variables at
 once, prefixed by each connection's own `id`).
+
+## Compliance & observability tooling
+
+The original `workspaces-host` treated the sandbox itself as a service you
+can audit for SOC2 and similar compliance requirements, using `osquery`,
+`cnquery`, and `steampipe` for endpoint/system observability plus
+`OpenObserve` for metrics/tracing/logging, and `surveilr` (from
+`surveilr/packages`, installed there via `eget`) to capture that state as
+evidence. Every profile installs all five on `PATH`, so there's nothing
+extra to opt into:
+
+- **`osqueryi`** (interactive) / `osqueryd` (daemon) - SQL-queryable
+  operating-system instrumentation (processes, open files, listening
+  sockets, installed packages, ...). Nixpkgs packages `osquery` as
+  Linux-only (`meta.platforms = platforms.linux` - it wraps
+  Linux-specific instrumentation), so it's only installed on
+  `x86_64-linux`/`aarch64-linux`; `doctor` reports this as an informational
+  WARN, not a FAIL, on Darwin.
+- **`cnquery`** - Mondoo's cloud-native, graph-based asset inventory query
+  tool; answers the same category of "what does this box/cloud
+  account/container actually look like" questions as `osquery`, but
+  across cloud/Kubernetes/API resources too, not just the local host.
+- **`steampipe`** - queries cloud, code, and log sources with plain SQL
+  via a Postgres foreign-data-wrapper interface; complements
+  `osquery`/`cnquery` when the audit question is more naturally a SQL
+  join across several plugins' tables than a one-off query.
+- **`openobserve`** - a self-hostable logs/metrics/traces backend (an
+  Elasticsearch/Splunk/Datadog alternative) for the sandbox's own
+  application-lifecycle observability. It's a binary on `PATH`, not a
+  running service - start it yourself (`openobserve` runs a local server)
+  when you actually want to ingest and query telemetry.
+- **`surveilr`** - opsfolio's Resource Surveillance and Integration
+  Engine; walks files/databases/APIs and resource-surveils them into a
+  local SQLite database, the same "capture evidence once, query it
+  however you like" idea `osquery`/`cnquery` apply to live system state,
+  applied to arbitrary resources instead. Upstream (`surveilr/packages`)
+  only publishes `x86_64` release binaries for Linux and Darwin - no
+  `aarch64` asset of either kind exists yet - so it's installed on
+  `x86_64-linux`/`x86_64-darwin` only; `doctor` reports its absence
+  elsewhere as an informational WARN, not a FAIL (see `pkgs/surveilr`).
+
+None of these run anything by default - they're audit/query tools you
+reach for, not background daemons this repository starts for you.
 
 ## Health check & rollback
 
