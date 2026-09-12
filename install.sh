@@ -127,7 +127,20 @@ else
     git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git "$WORKSPACES_HOST_REPO"
 fi
 
-# --- 5. Build and activate ----------------------------------------------
+# --- 5. Create the credentials file, if it doesn't exist yet -----------
+# Same template `workspaces-host-update` would bootstrap on its own
+# first run - done here too so it's already sitting there, ready to
+# fill in, the moment this script finishes, rather than needing an
+# extra "run workspaces-host-update once just to create it" round trip.
+credentials_file="${XDG_CONFIG_HOME:-$HOME/.config}/workspaces-host/credentials"
+if [ ! -f "$credentials_file" ]; then
+    log "creating $credentials_file from the template"
+    mkdir -p "$(dirname "$credentials_file")"
+    cp "$WORKSPACES_HOST_REPO/credentials.example" "$credentials_file"
+    chmod 600 "$credentials_file"
+fi
+
+# --- 6. Build and activate ----------------------------------------------
 cd "$WORKSPACES_HOST_REPO"
 log "building $WORKSPACES_HOST_PROFILE (downloads everything needed - can take a few minutes the first time)"
 nix build ".#homeConfigurations.${WORKSPACES_HOST_PROFILE}.activationPackage" --impure
@@ -135,6 +148,6 @@ log "activating"
 ./result/activate
 
 log "done - open a new shell, then:"
-log "  1. run 'workspaces-host-update' to set up your git identity, GitHub/GitLab tokens, and AI harness API keys (README's 'Setting up your credentials' section)"
+log "  1. edit $credentials_file (your name/email, tokens, API keys) and run 'workspaces-host-update' to apply it - see README's 'Setting up your credentials' section"
 log "  2. run 'doctor' to verify everything"
 log "  3. (optional, recommended) see README's 'Fonts for the prompt icons' section for the last step"
