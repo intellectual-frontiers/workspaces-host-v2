@@ -94,14 +94,18 @@ titled "Debian"), except step 1.
    ```console
    $ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/.workspaces-host-v2
    $ cd ~/.workspaces-host-v2
-   $ nix build .#homeConfigurations.default.activationPackage
+   $ nix build .#homeConfigurations.current.activationPackage --impure
    $ ./result/activate
    ```
    This downloads everything the setup needs and can take a few minutes
    the first time - that's expected. The leading `.` in
    `.workspaces-host-v2` just keeps it out of a plain `ls` of your home
    folder - it's a completely normal folder otherwise, and `cd
-   ~/.workspaces-host-v2` gets you there any time.
+   ~/.workspaces-host-v2` gets you there any time. `current` and
+   `--impure` mean "build this for whoever's actually running it" - Nix
+   normally insists everything be fully self-contained (no reading your
+   actual username), so this one flag is how you tell it "yes, really use
+   my real account" instead of a placeholder one.
 8. **Check that it worked:**
    ```console
    $ doctor
@@ -197,14 +201,9 @@ distro (Ubuntu, etc.):**
   ```console
   $ sh <(curl -L https://nixos.org/nix/install)
   ```
-- In step 7, macOS's setup isn't called `default` - use your actual
-  system name everywhere a command below says `default`:
-  ```console
-  $ nix build .#homeConfigurations.aarch64-darwin.activationPackage   # Apple Silicon
-  $ nix build .#homeConfigurations.x86_64-darwin.activationPackage    # Intel
-  $ ./result/activate
-  $ home-manager switch --flake .#aarch64-darwin   # for future updates
-  ```
+- Step 7 is completely unchanged - `current` already senses whether
+  you're on Apple Silicon or Intel, so there's nothing macOS-specific to
+  substitute into any command.
 - A handful of pieces (container sandboxing, and any tool that only
   exists for Linux) aren't installed on macOS - everything else is
   identical.
@@ -414,10 +413,9 @@ so a second version manager on top of it would just duplicate that job.
 
 If you need a different JDK version or vendor than the one nixpkgs pins
 here, override `home/java.nix`'s `pkgs.jdk`/`pkgs.maven` in a fork (e.g.
-`pkgs.temurin-bin` for a specific Temurin release), the same override
-pattern as every other default in this repo (git identity, the Nerd
-Font choice, etc.) - see `specs/015-java-toolchain/spec.md` for the exact
-packages this pins today.
+`pkgs.temurin-bin` for a specific Temurin release) - see
+`specs/015-java-toolchain/spec.md` for the exact packages this pins
+today.
 
 ## Keeping your sandbox in sync
 
@@ -430,7 +428,7 @@ stay current.
 ```console
 $ cd ~/.workspaces-host-v2   # or wherever $WORKSPACES_HOST_REPO points
 $ git pull
-$ home-manager switch --flake .#default   # or your profile
+$ home-manager switch --flake .#current --impure   # or your profile
 ```
 
 ### The one-command way
@@ -446,8 +444,10 @@ either in a fork or via `home.sessionVariables` if you need to):
 
 - `WORKSPACES_HOST_REPO` (default `~/.workspaces-host-v2`) - where this
   repo is cloned.
-- `WORKSPACES_HOST_PROFILE` (default `default`) - which flake profile to
-  switch to (`default`, or a persona like `backend`).
+- `WORKSPACES_HOST_PROFILE` (default `current`) - which flake profile to
+  switch to (`current`, a persona like `current-backend`, or the fixed
+  test identities `default`/`backend`/etc. if you specifically want
+  those instead).
 
 ### The nudge (so you actually remember to)
 
@@ -470,18 +470,31 @@ environment and shouldn't happen unattended.
 
 ### Your name and email (git identity)
 
-This setup writes `~/.gitconfig` for you from a file inside this
-repository, so editing `~/.gitconfig` by hand gets silently overwritten
-the next time you sync (see "Keeping your sandbox in sync" above).
-Change your name/email here instead, with one command:
+Every personal override - your git name/email, any real secrets you
+declare - goes in one file **outside this repository entirely**:
+`~/.config/workspaces-host/local.nix`. This repo reads it automatically
+if it exists, and never writes to it, so `git pull`/`workspaces-host-update`
+can never touch it, overwrite it, or conflict with it - unlike editing a
+file inside the repo itself, which a future update could collide with.
+`local.nix.example` (in this repo) shows the format.
+
+Set your name/email with one command:
 
 ```console
-$ sed -i 's/Workspace Engineer/Your Name/; s/workspace@example.invalid/you@example.com/' ~/.workspaces-host-v2/home/git.nix
+$ mkdir -p ~/.config/workspaces-host
+$ cat > ~/.config/workspaces-host/local.nix <<'EOF'
+{
+  programs.git.userName = "Your Name";
+  programs.git.userEmail = "you@example.com";
+}
+EOF
 $ workspaces-host-update
 ```
 
 Replace `Your Name` and `you@example.com` with your own, then run it.
 `doctor`'s `WARN` about your git identity goes away once this is applied.
+If the file already exists (you've added something else to it already),
+add these two lines to its existing `{ ... }` instead of overwriting it.
 
 ### Database passwords (`~/.pgpass`)
 
@@ -515,12 +528,13 @@ simplest safe way to handle it:
 
 1. **Get a short-lived token** from GitHub/GitLab (both let you set an
    expiration date when you create one) instead of a permanent one.
-2. **Encrypt it once**, using the `age`/`sops` tools this setup already
-   installs:
+2. **Encrypt it once**, next to your `local.nix` (see above), using the
+   `age`/`sops` tools this setup already installs:
    ```console
-   $ echo -n "ghp_yourToken" | sops --encrypt --age <your-age-public-key> /dev/stdin > github-token.enc.yaml
+   $ echo -n "ghp_yourToken" | sops --encrypt --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/github-token.enc.yaml
    ```
-3. **Tell this setup about it**, in your home-manager config:
+3. **Tell this setup about it**, in `~/.config/workspaces-host/local.nix`
+   (add to the same file as your git identity above):
    ```nix
    workspacesHost.secrets.github-token = {
      sopsFile = ./github-token.enc.yaml;

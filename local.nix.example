@@ -1,0 +1,23 @@
+# Copy this file to ~/.config/workspaces-host/local.nix and edit it - do
+# NOT put it inside this repository. It's the one supported place for
+# personal overrides (git identity, real secrets declarations, tool
+# preferences), read automatically by every profile if it exists there.
+# Because it lives outside this repo entirely, `git pull`/
+# `workspaces-host-update` can never touch it or conflict with it -
+# see README's "Updating your Git identity, and other secrets, from the
+# CLI" section.
+{
+  # Your actual git identity (home/git.nix's defaults are placeholders
+  # meant to be overridden exactly like this, not hand-edited in place).
+  programs.git.userName = "Your Name";
+  programs.git.userEmail = "you@example.com";
+
+  # Real secrets go here too, once you've encrypted them - see README's
+  # "GitHub/GitLab tokens, and other secrets that expire" section. This
+  # is commented out; uncomment once github-token.enc.yaml sits next to
+  # this file (~/.config/workspaces-host/github-token.enc.yaml).
+  # workspacesHost.secrets.github-token = {
+  #   sopsFile = ./github-token.enc.yaml;
+  #   path = "github-token";
+  # };
+}

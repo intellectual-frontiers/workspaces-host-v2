@@ -43,8 +43,11 @@
             ./home
           ] ++ extraModules ++ [
             {
-              # Example/default identity - override per-user by forking
-              # this module set; see quickstart.md.
+              # Fixed test identity, deliberately NOT "the real you" -
+              # this is what `nix flake check`/CI builds against, so it
+              # has to be pure (no reading the environment). Real
+              # installs use `homeConfigurations.current` below instead,
+              # which picks up your actual username/home directory.
               home.username = "workspace";
               home.homeDirectory =
                 if nixpkgs.lib.hasSuffix "darwin" system
@@ -68,6 +71,39 @@
       # persona x system combination up front.
       personaConfigurations = nixpkgs.lib.mapAttrs
         (_name: modulePath: mkHomeConfiguration "x86_64-linux" [ modulePath ])
+        personaModules;
+
+      # The identity real installs actually use: `builtins.getEnv`/
+      # `builtins.currentSystem` read whoever is actually running the
+      # build, instead of the fixed "workspace" identity every other
+      # `homeConfigurations.*` attribute above uses for CI/reproducibility.
+      # This is why it needs `--impure` (see README's Installation
+      # section) - `nix flake check` never touches it, so CI stays fully
+      # pure and unaffected; this is purely additive.
+      mkCurrentUserHomeConfiguration = extraModules:
+        home-manager.lib.homeManagerConfiguration {
+          pkgs = pkgsFor builtins.currentSystem;
+          modules = [
+            ./home
+          ] ++ extraModules ++ [
+            {
+              home.username = builtins.getEnv "USER";
+              home.homeDirectory = builtins.getEnv "HOME";
+              home.stateVersion = "24.11";
+            }
+          ];
+        };
+
+      # One "current-<persona>" per persona module, same relationship
+      # `current` has to `default`: the real-identity counterpart to
+      # `personaConfigurations` above, so a persona profile also works
+      # for whoever is actually running it, not just an engineer whose
+      # real username happens to be "workspace".
+      currentPersonaConfigurations = nixpkgs.lib.mapAttrs'
+        (name: modulePath: {
+          name = "current-${name}";
+          value = mkCurrentUserHomeConfiguration [ modulePath ];
+        })
         personaModules;
     in
     {
@@ -96,14 +132,18 @@
       );
 
       # One home-manager profile per supported system, so `nix flake check`
-      # and CI can build every platform. `default` aliases the profile for
-      # this repo's primary target (x86_64-linux); engineers on another
-      # platform use that system's own name instead of `default`
-      # (see specs/001-core-flake-home-manager/quickstart.md). The named
-      # persona profiles (backend/data/mobile/agent-ops - Phase 6) layer a
-      # focused extra package set on top of that same base.
-      homeConfigurations = homeConfigurationsFor // personaConfigurations // {
+      # and CI can build every platform. `default`/per-system/persona
+      # profiles all use the fixed "workspace" test identity above -
+      # useful for CI and reproducibility, but only actually installable
+      # as-is by someone whose real username/home directory happen to
+      # match it. Real installs (see README's Installation section) use
+      # `current`/`current-<persona>` instead, which need `--impure` but
+      # pick up whoever is actually running the build - this is the
+      # profile `workspaces-host-update` (pkgs/workspaces-host-update)
+      # defaults to.
+      homeConfigurations = homeConfigurationsFor // personaConfigurations // currentPersonaConfigurations // {
         default = homeConfigurationsFor.x86_64-linux;
+        current = mkCurrentUserHomeConfiguration [ ];
       };
 
       checks = forAllSystems (system: {

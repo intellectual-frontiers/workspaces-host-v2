@@ -58,11 +58,25 @@ echo "-- Git --"
 check_cmd git
 if command -v git >/dev/null 2>&1; then
     email=$(git config --get user.email 2>/dev/null || true)
-    if [ -n "$email" ]; then
-        pass "git user.email is set ($email)"
-    else
+    case "$email" in
+    "")
         warn "git user.email is not set"
-    fi
+        ;;
+    *@example.invalid)
+        warn "git user.email is still the placeholder ($email) - see README's 'Updating your Git identity' section"
+        ;;
+    *)
+        pass "git user.email is set ($email)"
+        ;;
+    esac
+fi
+
+echo
+echo "-- Local configuration override (~/.config/workspaces-host/local.nix) --"
+if [ -f "$HOME/.config/workspaces-host/local.nix" ]; then
+    pass "~/.config/workspaces-host/local.nix exists (personal overrides live outside this repo, safe from every sync)"
+else
+    warn "~/.config/workspaces-host/local.nix not found - see README's 'Updating your Git identity, and other secrets, from the CLI' section; local.nix.example in this repo shows the format"
 fi
 
 echo

@@ -5,8 +5,18 @@
 # home-manager switch --flake ...".
 set -eu
 
+# Some shells/environments don't export $USER even though `whoami` works
+# (observed in real testing, not hypothetical) - the `current`/
+# `current-<persona>` profiles below need it to pick up your real
+# identity instead of the fixed "workspace" test identity.
+: "${USER:=$(whoami)}"
+export USER
+
 REPO="${WORKSPACES_HOST_REPO:-$HOME/.workspaces-host-v2}"
-PROFILE="${WORKSPACES_HOST_PROFILE:-default}"
+# `current` picks up your real username/home directory (see flake.nix) -
+# this is what a real install actually uses; `default`/a persona name
+# remain available for anyone deliberately using the fixed test identity.
+PROFILE="${WORKSPACES_HOST_PROFILE:-current}"
 
 if [ ! -d "$REPO/.git" ]; then
     cat >&2 <<EOF
@@ -24,4 +34,4 @@ echo "workspaces-host-update: pulling $REPO ..." >&2
 git -C "$REPO" pull --ff-only
 
 echo "workspaces-host-update: switching to $PROFILE ..." >&2
-exec home-manager switch --flake "$REPO#$PROFILE"
+exec home-manager switch --flake "$REPO#$PROFILE" --impure
