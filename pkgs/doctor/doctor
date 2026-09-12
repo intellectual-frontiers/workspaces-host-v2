@@ -115,6 +115,19 @@ else
 fi
 
 echo
+echo "-- Java toolchain --"
+check_cmd java
+check_cmd mvn
+if command -v java >/dev/null 2>&1; then
+    pass "java $(java -version 2>&1 | head -1)"
+fi
+if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    pass "JAVA_HOME is set and valid ($JAVA_HOME)"
+else
+    warn "JAVA_HOME is not set or not valid (did home-manager switch run?)"
+fi
+
+echo
 echo "-- Optional: container tooling --"
 if command -v docker >/dev/null 2>&1; then
     pass "docker is on PATH (needed to run packages.<system>.oci-image*)"

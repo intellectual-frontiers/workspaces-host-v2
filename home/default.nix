@@ -10,6 +10,7 @@
     ./fonts.nix
     ./workspaces.nix
     ./postgres.nix
+    ./java.nix
   ];
 
   # home.username, home.homeDirectory, and home.stateVersion are supplied by
