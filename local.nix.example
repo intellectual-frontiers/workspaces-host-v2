@@ -15,9 +15,19 @@
   # Real secrets go here too, once you've encrypted them - see README's
   # "GitHub/GitLab tokens, and other secrets that expire" section. This
   # is commented out; uncomment once github-token.enc.yaml sits next to
-  # this file (~/.config/workspaces-host/github-token.enc.yaml).
+  # this file (~/.config/workspaces-host/github-token.enc.yaml). A bare
+  # `path` like this one is scoped per-project via direnv, not ambient.
   # workspacesHost.secrets.github-token = {
   #   sopsFile = ./github-token.enc.yaml;
   #   path = "github-token";
+  # };
+
+  # An AI harness credential (Claude Code, Codex, Gemini CLI, aider, ...)
+  # instead wants a `path` under "env/" - that convention auto-exports it
+  # into every interactive shell, not just one project. See README's
+  # "Setting up AI harness credentials" section.
+  # workspacesHost.secrets.anthropic-key = {
+  #   sopsFile = ./anthropic-key.enc.yaml;
+  #   path = "env/ANTHROPIC_API_KEY";
   # };
 }

@@ -537,7 +537,7 @@ simplest safe way to handle it:
 2. **Encrypt it once**, next to your `local.nix` (see above), using the
    `age`/`sops` tools this setup already installs:
    ```console
-   $ echo -n "ghp_yourToken" | sops --encrypt --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/github-token.enc.yaml
+   $ echo -n "ghp_yourToken" | sops --encrypt --output-type yaml --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/github-token.enc.yaml
    ```
 3. **Tell this setup about it**, in `~/.config/workspaces-host/local.nix`
    (add to the same file as your git identity above):
@@ -569,14 +569,62 @@ decrypted file, every `.envrc` that reads it - picks up the new value
 automatically; there's no code to change and no old plaintext left
 behind.
 
+### Setting up AI harness credentials
+
+Every profile installs `nodejs` (needed by every AI CLI below) and
+`aider-chat` (provider-agnostic, so it works with whichever API key you
+have - already on PATH, nothing to install). The fast-moving hosted CLIs
+below aren't packaged in this flake's pinned nixpkgs - install them with
+their own `npm install -g`, same as upstream documents:
+
+```console
+$ npm install -g @anthropic-ai/claude-code   # provides: claude
+$ npm install -g @openai/codex               # provides: codex
+$ npm install -g @google/gemini-cli          # provides: gemini
+$ gh extension install github/gh-copilot     # GitHub Copilot CLI, via gh
+```
+
+`doctor` checks whether each is installed and whether it has a key to
+use.
+
+**Giving each one its API key, safely**: the same `local.nix` +
+`workspacesHost.secrets` mechanism used for the GitHub token above has a
+convention just for this - a `path` starting with `env/` is
+auto-exported as an environment variable (named after the file) in
+*every* interactive shell, not just one project via `.envrc`, which is
+the right scope for a credential a harness needs everywhere:
+
+```console
+$ echo -n "sk-ant-yourRealKey" | sops --encrypt --output-type yaml --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/anthropic-key.enc.yaml
+```
+
+```nix
+workspacesHost.secrets.anthropic-key = {
+  sopsFile = ./anthropic-key.enc.yaml;
+  path = "env/ANTHROPIC_API_KEY";
+};
+```
+
+Run `workspaces-host-update`, open a new shell, and `$ANTHROPIC_API_KEY`
+is set automatically - decrypted fresh each activation, never written to
+a tracked file. The same recipe works for `OPENAI_API_KEY`,
+`GEMINI_API_KEY`/`GOOGLE_API_KEY`, or any other credential a CLI reads
+from the environment; just change the `path` suffix and the secret name.
+If a CLI supports its own browser-based `login` command instead (Claude
+Code and Gemini CLI both do), that works too - `doctor` only warns if
+neither an env var nor an existing login is present, it doesn't require
+one specific method.
+
 ## Health check & rollback
 
 Run `doctor` (installed by every profile) to check that Nix, the shell
 stack, git, and every ported CLI tool are actually present and working -
 plus a set of checks aimed specifically at mistakes that are easy to
 make if you're new to Linux/WSL: GitHub/GitLab CLI authentication,
-SSH key existence and permissions, working under WSL's slower `/mnt/c`
-Windows filesystem by mistake, low disk space, a misconfigured locale, a
+whether the AI harness CLIs (Claude Code, Codex, Gemini CLI, aider,
+GitHub Copilot CLI) are installed and have a credential to use, SSH key
+existence and permissions, working under WSL's slower `/mnt/c` Windows
+filesystem by mistake, low disk space, a misconfigured locale, a
 plaintext `~/.netrc` with the wrong permissions, an overly permissive
 `umask`, and Docker group membership:
 

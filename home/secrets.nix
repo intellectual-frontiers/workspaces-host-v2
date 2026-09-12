@@ -18,17 +18,42 @@ let
           build time).
         '';
       };
+      extractKey = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "data";
+        description = ''
+          Which top-level key to pull the bare value from before writing
+          it out. `sops --encrypt` wraps unstructured input (e.g.
+          `echo -n "value" | sops --encrypt ... /dev/stdin`, the pattern
+          README documents for tokens/API keys) under a `data` key - a
+          plain `sops --decrypt` on that file returns the *whole
+          document* (literally `data: value`), not the bare value, which
+          silently produces a broken `export
+          FOO=$(cat decrypted-file)` (a real bug, caught by testing this
+          module's actual decrypted output rather than trusting the
+          command not to error). Defaulting this to `"data"` makes the
+          common case - one secret, one file, used as a bare value -
+          correct out of the box. Set to `null` if you deliberately
+          encrypted a multi-key file and want sops's raw decrypted
+          output (e.g. full YAML/JSON) instead of one extracted field.
+        '';
+      };
     };
   };
 
   secretsStateDir = "${config.xdg.stateHome}/workspaces-host/secrets";
 
-  decryptOne = name: secret: ''
-    mkdir -p "$(dirname "${secretsStateDir}/${secret.path}")"
-    ${pkgs.sops}/bin/sops --decrypt "${secret.sopsFile}" > "${secretsStateDir}/${secret.path}.tmp"
-    chmod 600 "${secretsStateDir}/${secret.path}.tmp"
-    mv "${secretsStateDir}/${secret.path}.tmp" "${secretsStateDir}/${secret.path}"
-  '';
+  decryptOne = name: secret:
+    let
+      extractArg = lib.optionalString (secret.extractKey != null)
+        ''--extract '["${secret.extractKey}"]' '';
+    in
+    ''
+      mkdir -p "$(dirname "${secretsStateDir}/${secret.path}")"
+      ${pkgs.sops}/bin/sops --decrypt ${extractArg}"${secret.sopsFile}" > "${secretsStateDir}/${secret.path}.tmp"
+      chmod 600 "${secretsStateDir}/${secret.path}.tmp"
+      mv "${secretsStateDir}/${secret.path}.tmp" "${secretsStateDir}/${secret.path}"
+    '';
 in
 {
   options.workspacesHost.secrets = lib.mkOption {
