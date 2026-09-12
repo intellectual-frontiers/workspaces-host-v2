@@ -8,6 +8,7 @@
     ./tools.nix
     ./secrets.nix
     ./fonts.nix
+    ./workspaces.nix
   ];
 
   # home.username, home.homeDirectory, and home.stateVersion are supplied by
