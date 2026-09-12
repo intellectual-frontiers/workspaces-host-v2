@@ -572,7 +572,13 @@ behind.
 ## Health check & rollback
 
 Run `doctor` (installed by every profile) to check that Nix, the shell
-stack, git, and every ported CLI tool are actually present and working:
+stack, git, and every ported CLI tool are actually present and working -
+plus a set of checks aimed specifically at mistakes that are easy to
+make if you're new to Linux/WSL: GitHub/GitLab CLI authentication,
+SSH key existence and permissions, working under WSL's slower `/mnt/c`
+Windows filesystem by mistake, low disk space, a misconfigured locale, a
+plaintext `~/.netrc` with the wrong permissions, an overly permissive
+`umask`, and Docker group membership:
 
 ```console
 $ doctor

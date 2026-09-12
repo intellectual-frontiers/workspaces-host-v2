@@ -80,6 +80,114 @@ else
 fi
 
 echo
+echo "-- GitHub/GitLab authentication --"
+check_cmd gh
+if command -v gh >/dev/null 2>&1; then
+    if gh auth status >/dev/null 2>&1; then
+        pass "gh is authenticated"
+    else
+        warn "gh is not authenticated - run 'gh auth login' (see README's 'GitHub/GitLab tokens' section for a non-interactive, token-based alternative)"
+    fi
+fi
+check_cmd glab
+if command -v glab >/dev/null 2>&1; then
+    if glab auth status >/dev/null 2>&1; then
+        pass "glab is authenticated"
+    else
+        warn "glab is not authenticated - run 'glab auth login' if you use GitLab"
+    fi
+fi
+
+echo
+echo "-- Common pitfalls (SSH, WSL, disk, locale, plaintext creds) --"
+
+if [ -d "$HOME/.ssh" ]; then
+    ssh_dir_perm=$(stat -c '%a' "$HOME/.ssh" 2>/dev/null || stat -f '%Lp' "$HOME/.ssh" 2>/dev/null || echo '?')
+    if [ "$ssh_dir_perm" = "700" ]; then
+        pass "~/.ssh exists with mode 700"
+    else
+        warn "~/.ssh exists but mode is $ssh_dir_perm, not 700 - ssh may refuse to use it (chmod 700 ~/.ssh)"
+    fi
+    found_key=0
+    for key in "$HOME"/.ssh/id_*; do
+        [ -f "$key" ] || continue
+        case "$key" in
+        *.pub) continue ;;
+        esac
+        found_key=1
+        key_perm=$(stat -c '%a' "$key" 2>/dev/null || stat -f '%Lp' "$key" 2>/dev/null || echo '?')
+        if [ "$key_perm" = "600" ] || [ "$key_perm" = "400" ]; then
+            pass "$(basename "$key") exists with mode $key_perm"
+        else
+            warn "$(basename "$key") exists but mode is $key_perm, not 600 - ssh will refuse to use it (chmod 600 $key)"
+        fi
+    done
+    [ "$found_key" = "1" ] || warn "no SSH private key found in ~/.ssh (id_ed25519, id_rsa, ...) - 'ssh-keygen -t ed25519' if you use SSH-based git remotes"
+else
+    warn "~/.ssh does not exist - 'ssh-keygen -t ed25519' if you use SSH-based git remotes"
+fi
+
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    case "$HOME" in
+    /mnt/*)
+        warn "\$HOME ($HOME) is under /mnt - that's the Windows filesystem from inside WSL, which is much slower and has permissions quirks; keep your files on the Linux filesystem (e.g. under ~) instead"
+        ;;
+    *)
+        pass "\$HOME is on the Linux filesystem, not a slower /mnt/* Windows mount"
+        ;;
+    esac
+fi
+
+if command -v df >/dev/null 2>&1; then
+    avail_kb=$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {print $4}')
+    case "$avail_kb" in
+    '' | *[!0-9]*) ;;
+    *)
+        if [ "$avail_kb" -lt 2097152 ]; then
+            warn "less than 2 GiB free on the filesystem holding \$HOME - if /nix is on the same disk, try 'nix-collect-garbage -d'"
+        else
+            pass "disk space looks fine ($((avail_kb / 1048576)) GiB+ free)"
+        fi
+        ;;
+    esac
+fi
+
+if command -v locale >/dev/null 2>&1 && locale 2>&1 | grep -qi "cannot set"; then
+    warn "locale is misconfigured (locale(1) reports it cannot set LC_*) - common on a fresh Debian/WSL install; 'sudo apt install -y locales && sudo dpkg-reconfigure locales', or add 'export LANG=C.UTF-8' to your shell config"
+else
+    pass "locale looks configured correctly"
+fi
+
+if [ -f "$HOME/.netrc" ]; then
+    netrc_perm=$(stat -c '%a' "$HOME/.netrc" 2>/dev/null || stat -f '%Lp' "$HOME/.netrc" 2>/dev/null || echo '?')
+    if [ "$netrc_perm" != "600" ]; then
+        warn "~/.netrc exists with mode $netrc_perm, not 600 - it likely holds plaintext credentials readable by others (chmod 600 ~/.netrc); prefer 'gh auth login' or README's sops+direnv pattern instead"
+    else
+        warn "~/.netrc exists - if it holds real credentials, prefer 'gh auth login' or README's sops+direnv pattern over a plaintext credentials file"
+    fi
+fi
+
+current_umask=$(umask)
+case "$current_umask" in
+0000 | 000)
+    warn "umask is $current_umask (new files are world-writable by default) - add 'umask 022' to your shell config"
+    ;;
+*)
+    pass "umask is $current_umask"
+    ;;
+esac
+
+if command -v docker >/dev/null 2>&1; then
+    if [ "$(id -u)" = "0" ]; then
+        pass "running as root (docker group membership doesn't apply)"
+    elif id -nG 2>/dev/null | grep -qw docker; then
+        pass "you're in the 'docker' group (docker commands don't need sudo)"
+    else
+        warn "docker is installed but you're not in the 'docker' group - 'sudo usermod -aG docker \$USER' then log out and back in avoids needing sudo for every docker command"
+    fi
+fi
+
+echo
 echo "-- Ported CLI tools (home.packages) --"
 for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl pgpass gitleaks workspaces-host-update git-extras git-xargs; do
     check_cmd "$c"

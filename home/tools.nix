@@ -27,6 +27,17 @@ in
     eza
     fzf
     gitleaks
+    # `ssh`/`ssh-keygen` - most base OS images already have these, but
+    # this repo doesn't rely on that: `doctor`'s SSH-key check (pkgs/doctor)
+    # tells engineers to run `ssh-keygen` if they don't have one, so the
+    # tool itself needs to actually be here, hermetically, not assumed.
+    openssh
+    # GitHub/GitLab CLIs - `doctor` (pkgs/doctor) checks their auth
+    # status, since that's the actual, checkable signal that credentials
+    # are set up correctly (a token file could exist and still be
+    # expired/revoked; `gh auth status`/`glab auth status` catch that).
+    gh
+    glab
     # Compliance/observability tooling (see README's "Compliance &
     # observability tooling" section) - plain nixpkgs packages, so they
     # flow in here directly rather than through pkgs/default.nix's
