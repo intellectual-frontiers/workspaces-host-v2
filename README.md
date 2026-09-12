@@ -74,46 +74,29 @@ titled "Debian"), except step 1.
    pinned). The first time it opens, it asks you to choose a Linux
    username and password - these can be anything you like, and are
    separate from your Windows login.
-4. **From inside that Debian window**, install two small prerequisites:
+4. **From inside that Debian window, run the installer** - one command
+   does everything else (installs `curl`/`git` if needed, installs Nix,
+   turns on the one Nix feature this setup needs, downloads this repo,
+   and applies it):
    ```console
-   $ sudo apt update && sudo apt install -y curl git
+   $ sh -c "$(curl -fsSL https://raw.githubusercontent.com/intellectual-frontiers/workspaces-host-v2/main/install.sh)"
    ```
-5. **Install Nix**, which installs and manages everything else:
-   ```console
-   $ sh <(curl -L https://nixos.org/nix/install) --no-daemon
-   ```
-   Answer `y`/`yes` to anything it asks. When it finishes, close the
-   Debian window and reopen it so the `nix` command becomes available.
-6. **Turn on the one Nix feature this repository needs** - a single
-   command, no file to find and edit by hand:
-   ```console
-   $ mkdir -p ~/.config/nix
-   $ echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-   ```
-7. **Download and apply this setup:**
-   ```console
-   $ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/.workspaces-host-v2
-   $ cd ~/.workspaces-host-v2
-   $ nix build .#homeConfigurations.current.activationPackage --impure
-   $ ./result/activate
-   ```
-   This downloads everything the setup needs and can take a few minutes
-   the first time - that's expected. The leading `.` in
-   `.workspaces-host-v2` just keeps it out of a plain `ls` of your home
-   folder - it's a completely normal folder otherwise, and `cd
-   ~/.workspaces-host-v2` gets you there any time. `current` and
-   `--impure` mean "build this for whoever's actually running it" - Nix
-   normally insists everything be fully self-contained (no reading your
-   actual username), so this one flag is how you tell it "yes, really use
-   my real account" instead of a placeholder one.
-8. **Check that it worked:**
+   This can take a few minutes the first time - that's expected. It's
+   also safe to run again later (it skips anything already done, and
+   just updates/reapplies if you already have this installed) - that's
+   literally what `workspaces-host-update` does under the hood, once
+   you're set up (see "Keeping your sandbox in sync" below). If you'd
+   rather see or control each step yourself, or the installer doesn't
+   fit your setup, "What the installer actually does" below has the
+   exact equivalent commands.
+5. **Check that it worked:**
    ```console
    $ doctor
    ```
    Every line should say `PASS`. A `WARN` about your git name/email is
    normal on a brand-new machine - see "Updating your Git identity, and
    other secrets, from the CLI" below to fix it.
-9. **(Recommended) install the prompt's icon font** - see "Fonts for the
+6. **(Recommended) install the prompt's icon font** - see "Fonts for the
    prompt icons" below. It's a couple of extra steps, and the prompt
    still works without it, just with plain boxes instead of icons.
 
@@ -121,16 +104,53 @@ That's it - from now on, every new Debian/WSL window already has this
 setup active. To pick up future improvements to it, see "Keeping your
 sandbox in sync" below.
 
+### What the installer actually does (manual steps, if you'd rather)
+
+Everything `install.sh` does, spelled out - useful if you want to run it
+yourself piece by piece, understand what it changed, or it doesn't cover
+your exact setup:
+
+```console
+$ sudo apt update && sudo apt install -y curl git
+$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+```
+Answer `y`/`yes` to anything the Nix installer asks. When it finishes,
+close the Debian window and reopen it so the `nix` command becomes
+available, then:
+```console
+$ mkdir -p ~/.config/nix
+$ echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+$ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/.workspaces-host-v2
+$ cd ~/.workspaces-host-v2
+$ nix build .#homeConfigurations.current.activationPackage --impure
+$ ./result/activate
+```
+The leading `.` in `.workspaces-host-v2` just keeps it out of a plain
+`ls` of your home folder - it's a completely normal folder otherwise, and
+`cd ~/.workspaces-host-v2` gets you there any time. `current` and
+`--impure` mean "build this for whoever's actually running it" - Nix
+normally insists everything be fully self-contained (no reading your
+actual username), so this one flag is how you tell it "yes, really use my
+real account" instead of a placeholder one.
+
+`install.sh` (in this repo) is the actual source of truth for these
+steps - if it and this section ever disagree, trust the script; both are
+plain, readable shell, worth a skim before you pipe them into a shell
+either way.
+
 *Want to build/run this repository's container images inside WSL too?*
-That needs `systemd`, which is left off above to keep this install as
-simple as possible. See "Other platforms" below for the systemd-enabled
-install if you need it.
+That needs Docker, which needs `systemd` enabled in WSL - a separate,
+optional step from anything above (Nix itself doesn't need `systemd`
+either way). From an elevated PowerShell: create/edit `/etc/wsl.conf`
+inside Debian with `[boot]` / `systemd=true`, then `wsl --shutdown` and
+reopen Debian; then install Docker as described in "Other platforms"
+below.
 
 ### Fonts for the prompt icons
 
 The colorful prompt uses small icons (branch name, folder, a clock, ...)
 from a "Nerd Font" - a regular monospace font with extra symbols added.
-Step 7 above already installs the font file itself into your account;
+Step 4 above already installs the font file itself into your account;
 this step is about telling your actual terminal window to use it, which
 is a setting in the terminal app itself, not something Nix can turn on
 for you.
@@ -172,41 +192,27 @@ for you.
 
 ### Other platforms (Linux or macOS, no WSL)
 
-Everything above still applies - just skip the Windows-only parts
-(steps 1-3) and use these small adjustments:
+Just skip the Windows-only parts (steps 1-3) and open a regular terminal
+instead of "Debian" - steps 4-6 (the installer, `doctor`, the font) are
+otherwise identical, on any of these:
 
-**Linux (a VM, or directly on a real machine), Debian or a Debian-based
-distro (Ubuntu, etc.):**
-
-- Start straight at step 4 (`apt install`) - just open a regular
-  terminal.
-- In step 5, use the daemon-based install instead, since real Linux
-  already has `systemd` (this is a small quality-of-life improvement,
-  not required):
-  ```console
-  $ sh <(curl -L https://nixos.org/nix/install) --daemon
-  ```
-- Want to build/run this repository's container images? Also install
-  Docker: `sudo apt install -y docker.io` (or see
-  [docs.docker.com](https://docs.docker.com/engine/install/debian/) for
-  another distro's package).
-- Everything else (steps 4, 6-9) is identical.
-
-**macOS:**
-
-- Skip the `apt install` in step 4 too - macOS already has `curl`/`git`
-  (or get them via Homebrew or the Xcode Command Line Tools).
-- Step 5's installer works the same way on macOS, Apple Silicon or
-  Intel:
-  ```console
-  $ sh <(curl -L https://nixos.org/nix/install)
-  ```
-- Step 7 is completely unchanged - `current` already senses whether
-  you're on Apple Silicon or Intel, so there's nothing macOS-specific to
-  substitute into any command.
-- A handful of pieces (container sandboxing, and any tool that only
-  exists for Linux) aren't installed on macOS - everything else is
-  identical.
+- **Linux (a VM, or directly on a real machine)**: `install.sh`
+  auto-detects Debian/Ubuntu (`apt`), RHEL/Fedora/CentOS (`dnf`), and
+  Arch (`pacman`) for the one prerequisite-install step - no manual
+  adjustment needed for any of those families. Want to build/run this
+  repository's container images? Also install Docker:
+  `sudo apt install -y docker.io` (Debian/Ubuntu - see
+  [docs.docker.com](https://docs.docker.com/engine/install/) for another
+  distro's package).
+- **macOS**: the same `install.sh` command works unchanged, Apple
+  Silicon or Intel - it senses your system automatically (via `current`,
+  see "What the installer actually does" above). A handful of pieces
+  (container sandboxing, and any tool that only exists for Linux) aren't
+  installed on macOS - everything else is identical.
+- **A Linux distro `install.sh` doesn't recognize**: it tells you exactly
+  that, and exits without changing anything - install `curl`/`git`
+  yourself with your distro's own package manager, then re-run it; every
+  step after that is distro-agnostic.
 
 **Windows without WSL:** not possible, and there's nothing to document -
 Nix needs a real Linux or macOS system underneath it, and WSL (above) is
