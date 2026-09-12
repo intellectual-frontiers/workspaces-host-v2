@@ -36,10 +36,16 @@ as_root() {
     fi
 }
 
-# --- 1. Prerequisites (curl, git) - auto-sensed per distro family -----
+# --- 1. Prerequisites (curl, git, xz) - auto-sensed per distro family --
+# xz is easy to miss here: nothing above this line needs it, so a
+# genuinely minimal image can get all the way to the Nix installer
+# before it turns out to be missing - the Nix installer needs it to
+# unpack its own binary tarball (`tar` alone can't decompress .tar.xz on
+# Linux without it), a real gap hit directly on a fresh WSL Debian
+# image, not a hypothetical one.
 install_prereqs_linux() {
-    if command -v curl >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
-        log "curl and git already present"
+    if command -v curl >/dev/null 2>&1 && command -v git >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then
+        log "curl, git, and xz already present"
         return
     fi
     if [ -f /etc/os-release ]; then
@@ -52,20 +58,22 @@ install_prereqs_linux() {
     family=" ${ID:-} ${ID_LIKE:-} "
     case "$family" in
     *" debian "* | *" ubuntu "*)
-        log "installing curl/git via apt (Debian/Ubuntu family)"
+        log "installing curl/git/xz via apt (Debian/Ubuntu family)"
         as_root apt-get update
-        as_root apt-get install -y curl git
+        # The package is "xz-utils" on Debian/Ubuntu; it still provides
+        # the "xz" binary the Nix installer actually looks for.
+        as_root apt-get install -y curl git xz-utils
         ;;
     *" rhel "* | *" fedora "* | *" centos "*)
-        log "installing curl/git via dnf (RHEL/Fedora family)"
-        as_root dnf install -y curl git
+        log "installing curl/git/xz via dnf (RHEL/Fedora family)"
+        as_root dnf install -y curl git xz
         ;;
     *" arch "*)
-        log "installing curl/git via pacman (Arch family)"
-        as_root pacman -Sy --noconfirm curl git
+        log "installing curl/git/xz via pacman (Arch family)"
+        as_root pacman -Sy --noconfirm curl git xz
         ;;
     *)
-        die "unrecognized Linux distro (ID=${ID:-?} ID_LIKE=${ID_LIKE:-?}) - install curl and git yourself, then re-run this script"
+        die "unrecognized Linux distro (ID=${ID:-?} ID_LIKE=${ID_LIKE:-?}) - install curl, git, and xz yourself, then re-run this script"
         ;;
     esac
 }
@@ -78,7 +86,10 @@ Linux)
 Darwin)
     command -v curl >/dev/null 2>&1 || die "curl not found - install the Xcode Command Line Tools (xcode-select --install) and re-run"
     command -v git >/dev/null 2>&1 || die "git not found - install the Xcode Command Line Tools (xcode-select --install) and re-run"
-    log "curl and git already present (macOS)"
+    # Ships with macOS itself, unlike Linux - checked anyway rather than
+    # assumed, same as curl/git just above.
+    command -v xz >/dev/null 2>&1 || die "xz not found - install it (e.g. 'brew install xz') and re-run"
+    log "curl, git, and xz already present (macOS)"
     ;;
 *)
     die "unsupported OS: $os - this installer covers Linux and macOS (see README's Installation section; on Windows, run this from inside WSL)"
