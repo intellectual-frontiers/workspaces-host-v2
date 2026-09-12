@@ -134,4 +134,7 @@ nix build ".#homeConfigurations.${WORKSPACES_HOST_PROFILE}.activationPackage" --
 log "activating"
 ./result/activate
 
-log "done - run 'doctor' to verify, and see README's 'Fonts for the prompt icons' section for the last (optional, recommended) step"
+log "done - open a new shell, then:"
+log "  1. run 'workspaces-host-update' to set up your git identity, GitHub/GitLab tokens, and AI harness API keys (README's 'Setting up your credentials' section)"
+log "  2. run 'doctor' to verify everything"
+log "  3. (optional, recommended) see README's 'Fonts for the prompt icons' section for the last step"

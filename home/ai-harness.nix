@@ -1,10 +1,13 @@
 { config, lib, pkgs, ... }:
 
 let
-  # Where home/secrets.nix decrypts `path = "env/VARNAME"` secrets to -
-  # see home/secrets.nix and README's "Setting up AI harness credentials"
-  # section. Reused here rather than re-declared, so both modules agree
-  # on one location without either hardcoding a value the other computes.
+  # Where a credential ends up as a plain file named after its own
+  # variable - written directly by `workspaces-host-update` (see
+  # README's "Setting up your credentials" section) for the common case,
+  # or by home/secrets.nix's optional sops-based `path = "env/VARNAME"`
+  # mechanism for anyone who specifically wants field-level encryption
+  # at rest. Both feed the same directory; this module doesn't care
+  # which one wrote a given file, only that it might be there.
   secretsEnvDir = "${config.xdg.stateHome}/workspaces-host/secrets/env";
 
   # Constitution Principle III ("secrets never touch the agent's shell
@@ -25,8 +28,9 @@ let
   #      run the real binary, however it was installed (`npm install -g`
   #      or a Nix package).
   # If no matching secret is configured, this is a transparent no-op
-  # pass-through - a CLI's own browser-based `login` flow works exactly
-  # as if this wrapper didn't exist.
+  # pass-through - a CLI's own browser-based `login` flow (or `gh`/
+  # `glab`'s own stored auth, or an already-set env var from outside)
+  # works exactly as if this wrapper didn't exist.
   wrapCli = name: varNames:
     let
       # Fish scopes `set -l`/`-lx` to the *innermost enclosing block* -
@@ -57,8 +61,8 @@ let
 in
 {
   # AI-assisted CLI tooling, so an AI harness can help configure this
-  # sandbox itself right after install (edit local.nix, declare a
-  # secret, etc.), not just help with application code.
+  # sandbox itself right after install (edit the credentials file,
+  # explore a `doctor` WARN, etc.), not just help with application code.
   #
   # `aider-chat` is genuinely packaged in this flake's pinned nixpkgs and
   # provider-agnostic (works with Claude, GPT, Gemini, ... via whichever
@@ -82,10 +86,17 @@ in
     pkgs.aider-chat
   ];
 
+  # `gh`/`glab` (home/tools.nix) get the exact same treatment as the AI
+  # CLIs above: a GITHUB_TOKEN/GITLAB_TOKEN from the credentials file is
+  # scoped to just that one invocation, never the whole shell - the same
+  # mechanism, just applied to two more tools that read a token the same
+  # way an AI CLI reads an API key.
   programs.fish.functions = {
     claude = wrapCli "claude" [ "ANTHROPIC_API_KEY" ];
     codex = wrapCli "codex" [ "OPENAI_API_KEY" ];
     gemini = wrapCli "gemini" [ "GEMINI_API_KEY" "GOOGLE_API_KEY" ];
     aider = wrapCli "aider" [ "ANTHROPIC_API_KEY" "OPENAI_API_KEY" "GEMINI_API_KEY" "GOOGLE_API_KEY" ];
+    gh = wrapCli "gh" [ "GITHUB_TOKEN" "GH_TOKEN" ];
+    glab = wrapCli "glab" [ "GITLAB_TOKEN" ];
   };
 }

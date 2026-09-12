@@ -55,13 +55,13 @@ But that consistency is the thing to protect. If an AI harness (or a
 person) comes up with a genuinely good improvement while working in one
 sandbox - a new tool, a better default, an extra `doctor` check, a
 smarter install step - the right place for it is **this repository, via
-a pull request**, not just that one person's `local.nix` or a
-one-off tweak that only exists on their machine. `local.nix` (see
-"Updating your Git identity, and other secrets, from the CLI" below)
-exists for things that are genuinely personal - your name, your API
-keys - precisely so that everything else stays shared and in sync
-across the whole team. A good idea that only lives in one sandbox helps
-one person; the same idea merged back here helps everyone (and every
+a pull request**, not just that one person's credentials file or a
+one-off tweak that only exists on their machine. Your credentials file
+(see "Setting up your credentials" below) exists for things that are
+genuinely personal - your name, your API keys - precisely so that
+everything else stays shared and in sync across the whole team. A good
+idea that only lives in one sandbox helps one person; the same idea
+merged back here helps everyone (and every
 CI run, and every agent) who uses this setup after that.
 
 ## What you get
@@ -141,9 +141,9 @@ titled "Debian"), except step 1.
    ```console
    $ doctor
    ```
-   Every line should say `PASS`. A `WARN` about your git name/email is
-   normal on a brand-new machine - see "Updating your Git identity, and
-   other secrets, from the CLI" below to fix it.
+   Every line should say `PASS`. A `WARN` about your git name/email, or
+   about missing tokens/API keys, is normal on a brand-new machine - see
+   "Setting up your credentials" below to fix it with one command.
 6. **(Recommended) install the prompt's icon font** - see "Fonts for the
    prompt icons" below. It's a couple of extra steps, and the prompt
    still works without it, just with plain boxes instead of icons.
@@ -520,35 +520,118 @@ switch` for you. Applying a change is always your own explicit
 since a `home-manager switch` can restructure your shell/prompt/tool
 environment and shouldn't happen unattended.
 
-## Updating your Git identity, and other secrets, from the CLI
+## Setting up your credentials
 
-### Your name and email (git identity)
-
-Every personal override - your git name/email, any real secrets you
-declare - goes in one file **outside this repository entirely**:
-`~/.config/workspaces-host/local.nix`. This repo reads it automatically
-if it exists, and never writes to it, so `git pull`/`workspaces-host-update`
-can never touch it, overwrite it, or conflict with it - unlike editing a
-file inside the repo itself, which a future update could collide with.
-`local.nix.example` (in this repo) shows the format.
-
-Set your name/email with one command:
+Your git name/email, GitHub/GitLab tokens, and AI harness API keys all
+go in **one plain text file, outside this repository entirely**:
+`~/.config/workspaces-host/credentials`. It's just `KEY=value` lines -
+no Nix syntax, no encryption tool to learn first:
 
 ```console
-$ mkdir -p ~/.config/workspaces-host
-$ cat > ~/.config/workspaces-host/local.nix <<'EOF'
-{
-  programs.git.userName = "Your Name";
-  programs.git.userEmail = "you@example.com";
-}
-EOF
 $ workspaces-host-update
 ```
 
-Replace `Your Name` and `you@example.com` with your own, then run it.
-`doctor`'s `WARN` about your git identity goes away once this is applied.
-If the file already exists (you've added something else to it already),
-add these two lines to its existing `{ ... }` instead of overwriting it.
+The first time you run it with no credentials file yet, it creates one
+for you (copied from this repo's `credentials.example`) and stops there:
+
+```text
+workspaces-host-update: created ~/.config/workspaces-host/credentials
+
+Open it and fill in your name, email, and any tokens/API keys you have
+(leave the rest blank) - then run workspaces-host-update again.
+```
+
+Open it in any editor, fill in what you have (leave the rest blank),
+save, and run `workspaces-host-update` again:
+
+```console
+$ nano ~/.config/workspaces-host/credentials
+```
+```dotenv
+GIT_NAME=Your Name
+GIT_EMAIL=you@example.com
+
+GITHUB_TOKEN=ghp_yourToken
+GITLAB_TOKEN=
+
+ANTHROPIC_API_KEY=sk-ant-yourRealKey
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+```
+```console
+$ workspaces-host-update
+```
+
+That one command re-applies your setup with the new values *and*
+finishes by running `doctor`, so you see immediately whether everything
+took effect - no separate "now go check it worked" step.
+
+This file:
+
+- **Never leaves your machine.** It lives outside this repository, so
+  `git pull`/`workspaces-host-update` can never touch, overwrite, or
+  conflict with it, and there's nothing here to accidentally commit.
+- **Is protected the same way `~/.ssh` or `~/.aws/credentials` are**:
+  `workspaces-host-update` sets it to mode 600 (readable only by you)
+  every time it runs, and fixes the permissions automatically if
+  anything ever loosens them; `doctor` checks this too.
+- **Is read by a plain script, not by Nix.** `workspaces-host-update`
+  parses it as plain `KEY=value` text (never `source`s it as a shell
+  script, so a stray character in a token can't be executed as a
+  command), writes your git name/email into a file git itself includes
+  automatically, and drops each token/key into the same
+  per-command-scoped mechanism this setup already uses for AI CLI
+  credentials (see "Setting up AI harness credentials" below) - so a
+  key is only ever visible to the one command that actually needs it,
+  never the rest of your shell.
+
+**Rotating a token or key**: edit the same line in
+`~/.config/workspaces-host/credentials` and run `workspaces-host-update`
+again. There's no encrypted file to re-generate and no old plaintext
+left behind - the previous value is simply overwritten.
+
+**Something else that needs a credential** (a cloud provider token, a
+project-specific API key)? Add it to this same file with whatever name
+makes sense (e.g. `AWS_ACCESS_KEY_ID=...`) - `workspaces-host-update`
+writes any line that isn't `GIT_NAME`/`GIT_EMAIL` into
+`~/.local/state/workspaces-host/secrets/env/<NAME>`, ready for a
+project's own `.envrc` to pick up:
+
+```console
+$ echo 'export AWS_ACCESS_KEY_ID=$(cat ~/.local/state/workspaces-host/secrets/env/AWS_ACCESS_KEY_ID)' >> .envrc
+$ direnv allow
+```
+
+### Advanced: encrypting a secret at rest with sops
+
+The credentials file above is protected by ordinary file permissions,
+the same trust model as `~/.ssh/id_ed25519` or `~/.netrc` with the right
+mode - the right default for a personal, single-user sandbox. If you
+specifically want field-level *encryption at rest* for one credential
+(for example, because you back up or sync your `$HOME` config
+somewhere), this setup still has `age`/`sops` available as an opt-in,
+lower-level mechanism, unrelated to the credentials file above:
+
+1. **Encrypt it once**, next to your advanced `local.nix` (see
+   `local.nix.example`):
+   ```console
+   $ echo -n "ghp_yourToken" | sops --encrypt --output-type yaml --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/github-token.enc.yaml
+   ```
+2. **Declare it** in `~/.config/workspaces-host/local.nix`:
+   ```nix
+   workspacesHost.secrets.github-token = {
+     sopsFile = ./github-token.enc.yaml;
+     path = "env/GITHUB_TOKEN";
+   };
+   ```
+   Run `workspaces-host-update` and the real value is decrypted straight
+   into the same `~/.local/state/workspaces-host/secrets/env/GITHUB_TOKEN`
+   location the plain credentials file above would have written it to -
+   both mechanisms feed the same place, so pick whichever one secret
+   needs the extra step and leave the rest in the simple file.
+
+**When a token expires or needs rotating** this way: repeat step 1 with
+the new value, then run `workspaces-host-update` again.
 
 ### Database passwords (`~/.pgpass`)
 
@@ -563,9 +646,11 @@ localhost:5432:mydb:myuser:mypassword
 EOF
 ```
 
-### GitHub/GitLab tokens, and other secrets that expire
+### Keeping credentials out of git history
 
-Two habits keep real credentials out of git history entirely:
+Two habits keep real credentials out of every project's git history
+entirely, on top of the credentials file above (which is never inside
+any git repo to begin with):
 
 - Keep `.env` and any real credential file in your *project's own*
   `.gitignore` (not this repository's - every project's secrets are
@@ -576,46 +661,9 @@ Two habits keep real credentials out of git history entirely:
   ```console
   $ gitleaks detect --source . -v
   ```
-
-For a GitHub/GitLab token (or any secret a CLI tool needs), this is the
-simplest safe way to handle it:
-
-1. **Get a short-lived token** from GitHub/GitLab (both let you set an
-   expiration date when you create one) instead of a permanent one.
-2. **Encrypt it once**, next to your `local.nix` (see above), using the
-   `age`/`sops` tools this setup already installs:
-   ```console
-   $ echo -n "ghp_yourToken" | sops --encrypt --output-type yaml --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/github-token.enc.yaml
-   ```
-3. **Tell this setup about it**, in `~/.config/workspaces-host/local.nix`
-   (add to the same file as your git identity above):
-   ```nix
-   workspacesHost.secrets.github-token = {
-     sopsFile = ./github-token.enc.yaml;
-     path = "github-token";
-   };
-   ```
-   Run `workspaces-host-update` (or `home-manager switch`) and the real
-   value lands at `~/.local/state/workspaces-host/secrets/github-token` -
-   readable only by you, never in a file you'd accidentally commit.
-4. **Use it only where you need it.** In that one project, add a
-   `.envrc` (this setup already turns on `direnv`, which loads and
-   unloads environment variables automatically as you move in and out
-   of a folder):
-   ```console
-   $ echo 'export GITHUB_TOKEN=$(cat ~/.local/state/workspaces-host/secrets/github-token)' >> .envrc
-   $ direnv allow
-   ```
-   Now any tool that reads `$GITHUB_TOKEN` (like `gh`) sees it
-   automatically inside that folder, and it disappears the moment you
-   leave. The same steps work for `GITLAB_TOKEN`, a cloud provider
-   token, or anything else.
-
-**When a token expires or needs rotating**: repeat step 2 with the new
-value, then run `workspaces-host-update` again. Everything else - the
-decrypted file, every `.envrc` that reads it - picks up the new value
-automatically; there's no code to change and no old plaintext left
-behind.
+- Get a short-lived token from GitHub/GitLab (both let you set an
+  expiration date when you create one) instead of a permanent one, and
+  rotate it in your credentials file the same way, per above.
 
 ### Setting up AI harness credentials
 
@@ -635,61 +683,55 @@ $ gh extension install github/gh-copilot     # GitHub Copilot CLI, via gh
 `doctor` checks whether each is installed and whether it has a key to
 use.
 
-**Giving each one its API key, safely**: this project's own constitution
-is explicit that a secret must never become "an ambient environment
-variable available to an entire shell session" - so instead of exporting
-your key into every shell, the same `local.nix` +
-`workspacesHost.secrets` mechanism used for the GitHub token above has a
-convention that scopes it to just running the CLI itself. A `path`
-starting with `env/` decrypts to a file `claude`/`codex`/`gemini`/
-`aider`'s own fish wrapper function (`home/ai-harness.nix`) looks for -
-and only that wrapper's one invocation ever sees the value:
+**Giving each one its API key, safely**: add it to
+`~/.config/workspaces-host/credentials` (see "Setting up your
+credentials" above) and run `workspaces-host-update`:
 
-```console
-$ echo -n "sk-ant-yourRealKey" | sops --encrypt --output-type yaml --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/anthropic-key.enc.yaml
+```dotenv
+ANTHROPIC_API_KEY=sk-ant-yourRealKey
 ```
 
-```nix
-workspacesHost.secrets.anthropic-key = {
-  sopsFile = ./anthropic-key.enc.yaml;
-  path = "env/ANTHROPIC_API_KEY";
-};
-```
-
-Run `workspaces-host-update`, and every time you run `claude` afterward,
-its wrapper finds that decrypted file, sets `$ANTHROPIC_API_KEY` only
-for that one invocation, and never touches the rest of your shell -
-`echo $ANTHROPIC_API_KEY` in the same window stays empty. The same
-recipe works for `OPENAI_API_KEY` (`codex`), `GEMINI_API_KEY`/
-`GOOGLE_API_KEY` (`gemini`), or any of the four for `aider` (it accepts
-whichever it finds); just change the `path` suffix and the secret name.
-If a CLI supports its own browser-based `login` command instead (Claude
-Code and Gemini CLI both do), that works too - the wrapper is a
-transparent no-op when no matching secret is configured, and `doctor`
-only warns if neither a configured secret nor an existing login is
-present.
+This project's own constitution is explicit that a secret must never
+become "an ambient environment variable available to an entire shell
+session" - so instead of exporting your key into every shell,
+`claude`/`codex`/`gemini`/`aider`/`gh`/`glab` each get their own fish
+wrapper function (`home/ai-harness.nix`) that looks for their matching
+key and sets it only for that one invocation. Run `claude` afterward and
+its wrapper finds the value `workspaces-host-update` wrote, sets
+`$ANTHROPIC_API_KEY` only for that one call, and never touches the rest
+of your shell - `echo $ANTHROPIC_API_KEY` in the same window stays
+empty. The same applies to `OPENAI_API_KEY` (`codex`),
+`GEMINI_API_KEY`/`GOOGLE_API_KEY` (`gemini`), any of the four for
+`aider` (it accepts whichever it finds), and `GITHUB_TOKEN`/
+`GITLAB_TOKEN` (`gh`/`glab`). If a CLI supports its own browser-based
+`login` command instead (Claude Code and Gemini CLI both do), that works
+too - the wrapper is a transparent no-op when no matching credential is
+configured, and `doctor` only warns if neither a configured credential
+nor an existing login is present.
 
 **Using one of these to improve your setup?** Once a harness has a key,
 it's genuinely useful for exploring and fixing your own sandbox -
-diagnosing a `doctor` `WARN`, writing your `local.nix`, adding a project
-to `mgit.json`. If it comes up with something that would help beyond
-your own machine (a new tool, a better default, another `doctor` check),
-open a pull request against this repository with it instead of only
-keeping the change local - see "Why this exists" above for why that
-matters here specifically.
+diagnosing a `doctor` `WARN`, editing your credentials file, adding a
+project to `mgit.json`. If it comes up with something that would help
+beyond your own machine (a new tool, a better default, another `doctor`
+check), open a pull request against this repository with it instead of
+only keeping the change local - see "Why this exists" above for why
+that matters here specifically.
 
 ## Health check & rollback
 
 Run `doctor` (installed by every profile) to check that Nix, the shell
 stack, git, and every ported CLI tool are actually present and working -
 plus a set of checks aimed specifically at mistakes that are easy to
-make if you're new to Linux/WSL: GitHub/GitLab CLI authentication,
-whether the AI harness CLIs (Claude Code, Codex, Gemini CLI, aider,
-GitHub Copilot CLI) are installed and have a credential to use, SSH key
-existence and permissions, working under WSL's slower `/mnt/c` Windows
-filesystem by mistake, low disk space, a misconfigured locale, a
-plaintext `~/.netrc` with the wrong permissions, an overly permissive
-`umask`, and Docker group membership:
+make if you're new to Linux/WSL: whether
+`~/.config/workspaces-host/credentials` exists with the right
+permissions, GitHub/GitLab authentication (including via a token from
+that file), whether the AI harness CLIs (Claude Code, Codex, Gemini
+CLI, aider, GitHub Copilot CLI) are installed and have a credential to
+use, SSH key existence and permissions, working under WSL's slower
+`/mnt/c` Windows filesystem by mistake, low disk space, a misconfigured
+locale, a plaintext `~/.netrc` with the wrong permissions, an overly
+permissive `umask`, and Docker group membership:
 
 ```console
 $ doctor

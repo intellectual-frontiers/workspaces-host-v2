@@ -7,6 +7,11 @@ set -u
 
 FAILED=0
 
+# Where a credential ends up as a plain file named after its own
+# variable - see home/ai-harness.nix and workspaces-host-update. Used by
+# both the GitHub/GitLab and AI-harness sections below.
+secrets_env_dir="${XDG_STATE_HOME:-$HOME/.local/state}/workspaces-host/secrets/env"
+
 pass() { printf 'PASS  %s\n' "$1"; }
 warn() { printf 'WARN  %s\n' "$1"; }
 fail() { printf 'FAIL  %s\n' "$1"; FAILED=1; }
@@ -72,11 +77,25 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 echo
-echo "-- Local configuration override (~/.config/workspaces-host/local.nix) --"
-if [ -f "$HOME/.config/workspaces-host/local.nix" ]; then
-    pass "~/.config/workspaces-host/local.nix exists (personal overrides live outside this repo, safe from every sync)"
+echo "-- Credentials file (~/.config/workspaces-host/credentials) --"
+credentials_file="${XDG_CONFIG_HOME:-$HOME/.config}/workspaces-host/credentials"
+if [ -f "$credentials_file" ]; then
+    cred_perm=$(stat -c '%a' "$credentials_file" 2>/dev/null || stat -f '%Lp' "$credentials_file" 2>/dev/null || echo '?')
+    if [ "$cred_perm" = "600" ]; then
+        pass "~/.config/workspaces-host/credentials exists with mode 600"
+    else
+        warn "~/.config/workspaces-host/credentials exists but mode is $cred_perm, not 600 - run 'workspaces-host-update' to fix it automatically"
+    fi
 else
-    warn "~/.config/workspaces-host/local.nix not found - see README's 'Updating your Git identity, and other secrets, from the CLI' section; local.nix.example in this repo shows the format"
+    warn "~/.config/workspaces-host/credentials not found - run 'workspaces-host-update' once to create it from a template, then fill it in (see README's 'Setting up your credentials' section)"
+fi
+
+echo
+echo "-- Advanced: local.nix override (~/.config/workspaces-host/local.nix) --"
+if [ -f "$HOME/.config/workspaces-host/local.nix" ]; then
+    pass "~/.config/workspaces-host/local.nix exists (personal Nix-level overrides live outside this repo, safe from every sync)"
+else
+    pass "~/.config/workspaces-host/local.nix not present (fine - it's only needed for advanced Nix-level customization; see local.nix.example)"
 fi
 
 echo
@@ -85,16 +104,23 @@ check_cmd gh
 if command -v gh >/dev/null 2>&1; then
     if gh auth status >/dev/null 2>&1; then
         pass "gh is authenticated"
+    elif [ -f "$secrets_env_dir/GITHUB_TOKEN" ] &&
+        GITHUB_TOKEN="$(cat "$secrets_env_dir/GITHUB_TOKEN")" GH_TOKEN="$(cat "$secrets_env_dir/GITHUB_TOKEN")" \
+            gh auth status >/dev/null 2>&1; then
+        pass "gh is authenticated (via GITHUB_TOKEN in ~/.config/workspaces-host/credentials)"
     else
-        warn "gh is not authenticated - run 'gh auth login' (see README's 'GitHub/GitLab tokens' section for a non-interactive, token-based alternative)"
+        warn "gh is not authenticated - add GITHUB_TOKEN to ~/.config/workspaces-host/credentials and run 'workspaces-host-update', or run 'gh auth login' directly"
     fi
 fi
 check_cmd glab
 if command -v glab >/dev/null 2>&1; then
     if glab auth status >/dev/null 2>&1; then
         pass "glab is authenticated"
+    elif [ -f "$secrets_env_dir/GITLAB_TOKEN" ] &&
+        GITLAB_TOKEN="$(cat "$secrets_env_dir/GITLAB_TOKEN")" glab auth status >/dev/null 2>&1; then
+        pass "glab is authenticated (via GITLAB_TOKEN in ~/.config/workspaces-host/credentials)"
     else
-        warn "glab is not authenticated - run 'glab auth login' if you use GitLab"
+        warn "glab is not authenticated - add GITLAB_TOKEN to ~/.config/workspaces-host/credentials and run 'workspaces-host-update', or run 'glab auth login' directly, if you use GitLab"
     fi
 fi
 
@@ -161,9 +187,9 @@ fi
 if [ -f "$HOME/.netrc" ]; then
     netrc_perm=$(stat -c '%a' "$HOME/.netrc" 2>/dev/null || stat -f '%Lp' "$HOME/.netrc" 2>/dev/null || echo '?')
     if [ "$netrc_perm" != "600" ]; then
-        warn "~/.netrc exists with mode $netrc_perm, not 600 - it likely holds plaintext credentials readable by others (chmod 600 ~/.netrc); prefer 'gh auth login' or README's sops+direnv pattern instead"
+        warn "~/.netrc exists with mode $netrc_perm, not 600 - it likely holds plaintext credentials readable by others (chmod 600 ~/.netrc); prefer 'gh auth login' or a GITHUB_TOKEN in ~/.config/workspaces-host/credentials instead"
     else
-        warn "~/.netrc exists - if it holds real credentials, prefer 'gh auth login' or README's sops+direnv pattern over a plaintext credentials file"
+        warn "~/.netrc exists - if it holds real credentials, prefer 'gh auth login' or ~/.config/workspaces-host/credentials over a hand-maintained ~/.netrc"
     fi
 fi
 
@@ -189,7 +215,6 @@ fi
 
 echo
 echo "-- AI harness CLIs & credentials --"
-ai_secrets_dir="${XDG_STATE_HOME:-$HOME/.local/state}/workspaces-host/secrets/env"
 check_ai_cli() {
     cli="$1"
     label="$2"
@@ -202,17 +227,17 @@ check_ai_cli() {
     # Credentials for these CLIs are deliberately NOT ambient env vars
     # (Constitution Principle III - resolved at the point of use only,
     # via a per-CLI fish wrapper in home/ai-harness.nix), so check for
-    # the decrypted secret file the wrapper reads, not $VARNAME itself -
-    # an already-exported $VARNAME (e.g. from a project's own .envrc)
-    # still counts too.
+    # the secret file the wrapper reads, not $VARNAME itself - an
+    # already-exported $VARNAME (e.g. from a project's own .envrc) still
+    # counts too.
     for var in $key_vars; do
         eval "val=\${$var:-}"
-        if [ -n "$val" ] || [ -f "$ai_secrets_dir/$var" ]; then
-            pass "$label: $var is available (checked env and $ai_secrets_dir/)"
+        if [ -n "$val" ] || [ -f "$secrets_env_dir/$var" ]; then
+            pass "$label: $var is available (checked env and $secrets_env_dir/)"
             return
         fi
     done
-    warn "$label is installed but none of ($key_vars) is configured - see README's 'Setting up AI harness credentials' section, or use the CLI's own 'login' command"
+    warn "$label is installed but none of ($key_vars) is configured - add one to ~/.config/workspaces-host/credentials and run 'workspaces-host-update', or use the CLI's own 'login' command"
 }
 check_ai_cli claude "Claude Code" "ANTHROPIC_API_KEY"
 check_ai_cli codex "OpenAI Codex CLI" "OPENAI_API_KEY"

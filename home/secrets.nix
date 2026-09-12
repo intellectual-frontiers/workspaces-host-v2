@@ -60,22 +60,30 @@ in
     type = lib.types.attrsOf secretModule;
     default = { };
     description = ''
-      Declarative sops-encrypted secrets. Each is decrypted at
-      *activation* time (`home-manager switch`, every run - never at
-      build/eval time) into `$XDG_STATE_HOME/workspaces-host/secrets/`,
-      so the plaintext never lands in the world-readable Nix store.
-      Decryption uses whatever key `sops` itself is configured to find
-      (age key at `$XDG_CONFIG_HOME/sops/age/keys.txt` by convention, or
-      a PGP key in the ambient keyring) - this module intentionally does
-      not manage key material itself, per Constitution Principle III
-      ("secrets never touch the agent's shell unscoped"): provisioning
-      the decryption key is a deliberate, separate, human action.
+      Declarative, *advanced*, sops-encrypted secrets - for anyone who
+      specifically wants field-level encryption at rest for a given
+      credential. Most people don't need this: see
+      `~/.config/workspaces-host/credentials` and `workspaces-host-update`
+      (README's "Setting up your credentials" section) for the
+      recommended default - a plain `KEY=value` file, protected by
+      ordinary file permissions, with no `age`/`sops` steps at all.
+
+      Each secret declared here is decrypted at *activation* time
+      (`home-manager switch`, every run - never at build/eval time) into
+      `$XDG_STATE_HOME/workspaces-host/secrets/`, so the plaintext never
+      lands in the world-readable Nix store. Decryption uses whatever
+      key `sops` itself is configured to find (age key at
+      `$XDG_CONFIG_HOME/sops/age/keys.txt` by convention, or a PGP key in
+      the ambient keyring) - this module intentionally does not manage
+      key material itself, per Constitution Principle III ("secrets
+      never touch the agent's shell unscoped"): provisioning the
+      decryption key is a deliberate, separate, human action.
     '';
     example = lib.literalExpression ''
       {
         "github-token" = {
           sopsFile = ./secrets/github-token.enc.yaml;
-          path = "github-token";
+          path = "env/GITHUB_TOKEN";
         };
       }
     '';

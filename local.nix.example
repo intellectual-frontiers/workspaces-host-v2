@@ -1,34 +1,29 @@
 # Copy this file to ~/.config/workspaces-host/local.nix and edit it - do
 # NOT put it inside this repository. It's the one supported place for
-# personal overrides (git identity, real secrets declarations, tool
-# preferences), read automatically by every profile if it exists there.
-# Because it lives outside this repo entirely, `git pull`/
-# `workspaces-host-update` can never touch it or conflict with it -
-# see README's "Updating your Git identity, and other secrets, from the
-# CLI" section.
+# advanced, Nix-level personal overrides (tool preferences, persona
+# tweaks, extra packages), read automatically by every profile if it
+# exists there. Because it lives outside this repo entirely, `git pull`/
+# `workspaces-host-update` can never touch it or conflict with it.
+#
+# For the common case - your git name/email, GitHub/GitLab tokens, AI
+# harness API keys - you almost certainly want
+# ~/.config/workspaces-host/credentials instead (see credentials.example
+# and README's "Setting up your credentials" section): a plain
+# `KEY=value` file, no Nix syntax, that `workspaces-host-update` reads
+# and wires up for you. This file is for going beyond that.
 {
-  # Your actual git identity (home/git.nix's defaults are placeholders
-  # meant to be overridden exactly like this, not hand-edited in place).
-  programs.git.userName = "Your Name";
-  programs.git.userEmail = "you@example.com";
+  # Nix-level overrides go here, e.g. an extra package or a tool
+  # preference this repo doesn't already provide a knob for.
+  # home.packages = [ pkgs.ripgrep ];
 
-  # Real secrets go here too, once you've encrypted them - see README's
-  # "GitHub/GitLab tokens, and other secrets that expire" section. This
-  # is commented out; uncomment once github-token.enc.yaml sits next to
-  # this file (~/.config/workspaces-host/github-token.enc.yaml). A bare
-  # `path` like this one is scoped per-project via direnv, not ambient.
+  # Advanced: a sops-encrypted secret, for anyone who specifically wants
+  # field-level encryption at rest for a given credential (most people
+  # don't need this - ~/.config/workspaces-host/credentials, protected
+  # by ordinary file permissions like ~/.ssh or ~/.aws/credentials, is
+  # the recommended default). See home/secrets.nix and README's
+  # "Advanced: encrypting a secret at rest with sops" section.
   # workspacesHost.secrets.github-token = {
   #   sopsFile = ./github-token.enc.yaml;
-  #   path = "github-token";
-  # };
-
-  # An AI harness credential (Claude Code, Codex, Gemini CLI, aider, ...)
-  # instead wants a `path` under "env/" - that convention scopes it to
-  # just running the matching CLI (its own fish wrapper function reads
-  # it), never the whole shell session. See README's "Setting up AI
-  # harness credentials" section.
-  # workspacesHost.secrets.anthropic-key = {
-  #   sopsFile = ./anthropic-key.enc.yaml;
-  #   path = "env/ANTHROPIC_API_KEY";
+  #   path = "env/GITHUB_TOKEN";
   # };
 }
