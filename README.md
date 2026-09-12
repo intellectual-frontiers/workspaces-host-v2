@@ -122,21 +122,26 @@ titled "Debian"), except step 1.
    pinned). The first time it opens, it asks you to choose a Linux
    username and password - these can be anything you like, and are
    separate from your Windows login.
-4. **From inside that Debian window, run the installer** - one command
-   does everything else (installs `curl`/`git` if needed, installs Nix,
-   turns on the one Nix feature this setup needs, downloads this repo,
-   applies it, and creates a blank credentials file for the next step):
+4. **From inside that Debian window, run this one line** - a brand-new
+   Debian/WSL image doesn't include `curl` yet (nothing does, on a
+   minimal install), so this first installs just enough (`curl`, `git`)
+   to fetch and run the actual installer, which then does everything
+   else itself (installs Nix, turns on the one Nix feature this setup
+   needs, downloads this repo, applies it, and creates a blank
+   credentials file for the next step):
    ```console
-   $ sh -c "$(curl -fsSL https://raw.githubusercontent.com/intellectual-frontiers/workspaces-host-v2/main/install.sh)"
+   $ sudo apt-get update && sudo apt-get install -y curl git && sh -c "$(curl -fsSL https://raw.githubusercontent.com/intellectual-frontiers/workspaces-host-v2/main/install.sh)"
    ```
-   This can take a few minutes the first time - that's expected. It's
-   also safe to run again later (it skips anything already done, and
-   just updates/reapplies if you already have this installed) - that's
-   literally what `workspaces-host-update` does under the hood, once
-   you're set up (see "Keeping your sandbox in sync" below). If you'd
-   rather see or control each step yourself, or the installer doesn't
-   fit your setup, "What the installer actually does" below has the
-   exact equivalent commands.
+   `sudo` asks for the password you just set in step 3 - that's
+   expected, and the only password prompt in this whole process. The
+   whole line can take a few minutes the first time - that's expected.
+   It's also safe to run again later (everything in it skips whatever's
+   already done, and just updates/reapplies if you already have this
+   installed) - that's literally what `workspaces-host-update` does
+   under the hood, once you're set up (see "Keeping your sandbox in
+   sync" below). If you'd rather see or control each step yourself, or
+   the installer doesn't fit your setup, "What the installer actually
+   does" below has the exact equivalent commands.
 5. **Fill in your credentials, then apply them:**
    ```console
    $ nano ~/.config/workspaces-host/credentials
@@ -249,22 +254,31 @@ for you.
 ### Other platforms (Linux or macOS, no WSL)
 
 Just skip the Windows-only parts (steps 1-3) and open a regular terminal
-instead of "Debian" - steps 4-6 (the installer, your credentials, the
-font) are otherwise identical, on any of these:
+instead of "Debian" - steps 5-6 (your credentials, the font) are
+identical everywhere. Step 4 (the installer) differs only in how you get
+`curl`/`git` on the system in the first place, since `install.sh` itself
+can't run until something has fetched it:
 
-- **Linux (a VM, or directly on a real machine)**: `install.sh`
-  auto-detects Debian/Ubuntu (`apt`), RHEL/Fedora/CentOS (`dnf`), and
-  Arch (`pacman`) for the one prerequisite-install step - no manual
-  adjustment needed for any of those families. Want to build/run this
-  repository's container images? Also install Docker:
-  `sudo apt install -y docker.io` (Debian/Ubuntu - see
+- **Linux (a VM, or directly on a real machine)**: many VM/cloud images
+  already have `curl`/`git`; a genuinely minimal one (the same gap as
+  fresh WSL/Debian above) won't. If `curl -V` says "command not found,"
+  install both with your distro's own package manager first - `sudo
+  apt-get install -y curl git` (Debian/Ubuntu), `sudo dnf install -y
+  curl git` (RHEL/Fedora/CentOS), or `sudo pacman -Sy --noconfirm curl
+  git` (Arch) - then run the same one-liner as step 4 above. From there,
+  `install.sh` itself auto-detects whichever of those three families
+  you're on for anything else it still needs - no manual adjustment
+  needed. Want to build/run this repository's container images? Also
+  install Docker: `sudo apt install -y docker.io` (Debian/Ubuntu - see
   [docs.docker.com](https://docs.docker.com/engine/install/) for another
   distro's package).
-- **macOS**: the same `install.sh` command works unchanged, Apple
-  Silicon or Intel - it senses your system automatically (via `current`,
-  see "What the installer actually does" above). A handful of pieces
-  (container sandboxing, and any tool that only exists for Linux) aren't
-  installed on macOS - everything else is identical.
+- **macOS**: `curl` and `git` are always already there (Apple ships
+  both) - just run the plain one-liner from step 4 above (no
+  `apt-get`/`dnf`/`pacman` prefix - those aren't macOS things), Apple
+  Silicon or Intel, and it senses your system automatically (via
+  `current`, see "What the installer actually does" above). A handful of
+  pieces (container sandboxing, and any tool that only exists for Linux)
+  aren't installed on macOS - everything else is identical.
 - **A Linux distro `install.sh` doesn't recognize**: it tells you exactly
   that, and exits without changing anything - install `curl`/`git`
   yourself with your distro's own package manager, then re-run it; every
