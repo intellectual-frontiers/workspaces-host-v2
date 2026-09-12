@@ -11,5 +11,6 @@ in
     bat
     eza
     fzf
+    gitleaks
   ]);
 }
