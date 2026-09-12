@@ -20,24 +20,11 @@
     interactiveShellInit = ''
       set -g fish_greeting
 
-      # Any secret declared in `~/.config/workspaces-host/local.nix` via
-      # `workspacesHost.secrets` with a `path` starting "env/" (see
-      # README's "Setting up AI harness credentials" section) is
-      # auto-exported as an environment variable named after the file -
-      # e.g. `path = "env/ANTHROPIC_API_KEY";` becomes `$ANTHROPIC_API_KEY`
-      # in every shell, decrypted fresh from the Nix-store-free state
-      # directory home/secrets.nix already writes to, never read from a
-      # tracked file. Secrets declared WITHOUT the "env/" prefix (like
-      # the GitHub token example above) are deliberately NOT auto-exported
-      # here - that pattern is scoped per-project via direnv instead, on
-      # purpose, since not every secret should be in every shell.
-      set -l env_secrets_dir "$HOME/.local/state/workspaces-host/secrets/env"
-      if test -d "$env_secrets_dir"
-        for f in "$env_secrets_dir"/*
-          test -f "$f"; or continue
-          set -gx (basename "$f") (cat "$f")
-        end
-      end
+      # AI harness credentials (see home/ai-harness.nix) are deliberately
+      # NOT exported here: Constitution Principle III requires secrets be
+      # resolved "at the point of use," never as an ambient variable
+      # available to the whole shell session - each AI CLI gets its own
+      # wrapper function instead, scoped to just that one invocation.
 
       # Once a day, if $WORKSPACES_HOST_REPO is a real clone, check (in
       # the background, so shell startup is never blocked or slowed by a

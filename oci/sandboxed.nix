@@ -1,11 +1,17 @@
-{ pkgs, homeConfig }:
+{ pkgs, homeConfig
+, # Overridable, not because any *host* username matters inside this
+  # container (it's its own isolated identity namespace, unlike the
+  # real-host `current`/`current-<persona>` flake outputs elsewhere in
+  # this repo) - but so a caller who bind-mounts host directories into
+  # this image can match the container's user to their own host UID/GID
+  # and avoid a permission mismatch, without having to fork this file.
+  agentUid ? "1000"
+, agentGid ? "1000"
+}:
 
 let
   cfg = homeConfig.config;
   configFile = name: cfg.xdg.configFile.${name}.source;
-
-  agentUid = "1000";
-  agentGid = "1000";
 
   passwd = pkgs.writeTextDir "etc/passwd" ''
     root:x:0:0::/root:/bin/sh

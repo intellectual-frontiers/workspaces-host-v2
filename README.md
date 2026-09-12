@@ -16,6 +16,54 @@ sandbox in sync" below).
 See [`.specify/memory/constitution.md`](.specify/memory/constitution.md)
 for the principles behind these design choices.
 
+## Why this exists
+
+The point isn't just "a nice shell" - it's that a human engineer, a
+teammate who's new to Linux, a CI/CD pipeline, and an AI coding agent
+(Claude Code, Codex, an autonomous CI bot, ...) can all open a terminal
+on completely different machines and find the *exact same* structure:
+the same place repos get cloned to (`~/workspaces`, managed by `mgit`),
+the same command to check the environment (`doctor`), the same command
+to update it (`workspaces-host-update`), the same shell, the same
+tools, at the same versions. When everyone and everything working on a
+project - across engineering, DevOps, and an AI agent doing a chunk of
+the work overnight - shares one predictable layout, nobody (human or
+machine) has to re-learn "how this particular person's/pipeline's
+machine happens to be set up" before they can be useful on it.
+
+That matters more, not less, now that AI has put a real command line
+within reach of people who never expected to need one. Effectively
+everyone is an engineer now, at least some of the time - and everyone
+doing that work deserves the same consistent, good-looking, fully
+capable Linux environment, not a stripped-down or inconsistent one just
+because they're newer to it. On Windows, WSL already gives you the
+Windows desktop, files, and apps you know; `workspaces-host` is what
+gives the Linux side of that the same consistent, ready-to-go
+engineering setup everyone else on the team has - so the "new to Linux"
+part is the only unfamiliar piece, not the tooling itself.
+
+This is also why AI CLIs are provisioned as part of the standard
+environment (see "Setting up AI harness credentials" below): once an
+engineer - technical or not - has an API key configured the safe way
+this repo documents, they can point an AI harness at their own sandbox
+and ask it to help configure or improve their setup, the same way it
+would help with application code. That's a deliberate design goal, not
+an accident: lowering the barrier to actually using and improving a real
+engineering environment is the whole point.
+
+But that consistency is the thing to protect. If an AI harness (or a
+person) comes up with a genuinely good improvement while working in one
+sandbox - a new tool, a better default, an extra `doctor` check, a
+smarter install step - the right place for it is **this repository, via
+a pull request**, not just that one person's `local.nix` or a
+one-off tweak that only exists on their machine. `local.nix` (see
+"Updating your Git identity, and other secrets, from the CLI" below)
+exists for things that are genuinely personal - your name, your API
+keys - precisely so that everything else stays shared and in sync
+across the whole team. A good idea that only lives in one sandbox helps
+one person; the same idea merged back here helps everyone (and every
+CI run, and every agent) who uses this setup after that.
+
 ## What you get
 
 - A configured shell and prompt (fish + oh-my-posh) that looks and
@@ -587,12 +635,15 @@ $ gh extension install github/gh-copilot     # GitHub Copilot CLI, via gh
 `doctor` checks whether each is installed and whether it has a key to
 use.
 
-**Giving each one its API key, safely**: the same `local.nix` +
+**Giving each one its API key, safely**: this project's own constitution
+is explicit that a secret must never become "an ambient environment
+variable available to an entire shell session" - so instead of exporting
+your key into every shell, the same `local.nix` +
 `workspacesHost.secrets` mechanism used for the GitHub token above has a
-convention just for this - a `path` starting with `env/` is
-auto-exported as an environment variable (named after the file) in
-*every* interactive shell, not just one project via `.envrc`, which is
-the right scope for a credential a harness needs everywhere:
+convention that scopes it to just running the CLI itself. A `path`
+starting with `env/` decrypts to a file `claude`/`codex`/`gemini`/
+`aider`'s own fish wrapper function (`home/ai-harness.nix`) looks for -
+and only that wrapper's one invocation ever sees the value:
 
 ```console
 $ echo -n "sk-ant-yourRealKey" | sops --encrypt --output-type yaml --age <your-age-public-key> /dev/stdin > ~/.config/workspaces-host/anthropic-key.enc.yaml
@@ -605,15 +656,27 @@ workspacesHost.secrets.anthropic-key = {
 };
 ```
 
-Run `workspaces-host-update`, open a new shell, and `$ANTHROPIC_API_KEY`
-is set automatically - decrypted fresh each activation, never written to
-a tracked file. The same recipe works for `OPENAI_API_KEY`,
-`GEMINI_API_KEY`/`GOOGLE_API_KEY`, or any other credential a CLI reads
-from the environment; just change the `path` suffix and the secret name.
+Run `workspaces-host-update`, and every time you run `claude` afterward,
+its wrapper finds that decrypted file, sets `$ANTHROPIC_API_KEY` only
+for that one invocation, and never touches the rest of your shell -
+`echo $ANTHROPIC_API_KEY` in the same window stays empty. The same
+recipe works for `OPENAI_API_KEY` (`codex`), `GEMINI_API_KEY`/
+`GOOGLE_API_KEY` (`gemini`), or any of the four for `aider` (it accepts
+whichever it finds); just change the `path` suffix and the secret name.
 If a CLI supports its own browser-based `login` command instead (Claude
-Code and Gemini CLI both do), that works too - `doctor` only warns if
-neither an env var nor an existing login is present, it doesn't require
-one specific method.
+Code and Gemini CLI both do), that works too - the wrapper is a
+transparent no-op when no matching secret is configured, and `doctor`
+only warns if neither a configured secret nor an existing login is
+present.
+
+**Using one of these to improve your setup?** Once a harness has a key,
+it's genuinely useful for exploring and fixing your own sandbox -
+diagnosing a `doctor` `WARN`, writing your `local.nix`, adding a project
+to `mgit.json`. If it comes up with something that would help beyond
+your own machine (a new tool, a better default, another `doctor` check),
+open a pull request against this repository with it instead of only
+keeping the change local - see "Why this exists" above for why that
+matters here specifically.
 
 ## Health check & rollback
 

@@ -23,9 +23,10 @@
   # };
 
   # An AI harness credential (Claude Code, Codex, Gemini CLI, aider, ...)
-  # instead wants a `path` under "env/" - that convention auto-exports it
-  # into every interactive shell, not just one project. See README's
-  # "Setting up AI harness credentials" section.
+  # instead wants a `path` under "env/" - that convention scopes it to
+  # just running the matching CLI (its own fish wrapper function reads
+  # it), never the whole shell session. See README's "Setting up AI
+  # harness credentials" section.
   # workspacesHost.secrets.anthropic-key = {
   #   sopsFile = ./anthropic-key.enc.yaml;
   #   path = "env/ANTHROPIC_API_KEY";
