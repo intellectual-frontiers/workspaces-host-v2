@@ -36,32 +36,6 @@ for the principles behind these design choices.
 - A `doctor` command that checks everything is actually working, and an
   instant rollback if a change ever goes wrong.
 
-## Roadmap
-
-This project is built as a sequence of independent
-[Spec Kit](https://github.com/github/spec-kit) feature specs, each with its
-own spec → plan → tasks → implementation cycle and its own PR. No
-big-bang rewrite commits.
-
-| Phase | Status | Summary |
-|---|---|---|
-| 0 | ✅ | Bootstrap: Spec Kit, constitution |
-| 1 | ✅ | Core flake: `flake.nix` + home-manager module (fish, oh-my-posh, direnv/nix-direnv, git config, core CLI toolset) |
-| 2 | ✅ | Container/OCI parity |
-| 3 | ✅ | Agent-harness scaffolding (`.claude/`, `AGENTS.md`, MCP registry, skills convention) |
-| 4 | ✅ | Secrets (`sops-nix` / `op`, generalized backup/restore over `rclone`) |
-| 5 | ✅ | Agent sandboxing (network-egress allowlist) |
-| 6 | ✅ | Workspace profiles (per-persona flake outputs) |
-| 7 | ✅ | Doctor + rollback + CI (`nix flake check`) |
-| 8 | ✅ | oh-my-posh prompt theme (git-aware, icon-based segments) |
-| 9 | ✅ | Nerd Font support (installed font + human font-selection instructions) |
-| 10 | ✅ | Workspace repo management (`mgit`, `~/workspaces`): clone/update many repos into one governed layout |
-| 11 | ✅ | Compliance & observability tooling (`osquery`, `cnquery`, `steampipe`, `OpenObserve`, `surveilr`) |
-| 12 | ✅ | Bulk multi-repo git tooling (`git-extras`, `git-xargs`) |
-| 13 | ✅ | PostgreSQL credential tooling (`.pgpass`, `.psqlrc`, `pgpass` CLI) |
-| 14 | ✅ | Sandbox sync (`workspaces-host-update`) + secrets hygiene documentation |
-| 15 | ✅ | Java toolchain (nixpkgs `jdk`+`maven`) + macOS/Windows install docs |
-
 ## Installation
 
 This gets you a fully working shell with everything installed and turned
@@ -447,9 +421,9 @@ packages this pins today.
 
 ## Keeping your sandbox in sync
 
-New features and fixes land on this repo's `main` the same way everything
-in the Roadmap table did - small, independent, merged PRs. Your machine
-doesn't pick those up by itself; here's how to stay current.
+New features and fixes land on this repo's `main` as small, independent,
+merged PRs. Your machine doesn't pick those up by itself; here's how to
+stay current.
 
 ### The manual way (always works)
 
@@ -625,8 +599,10 @@ let rot - keeping the Spec Kit specs honest as the actual code moves on.
 1. **Point Claude Code at this README and `.specify/memory/constitution.md`**
    first if it's a fresh session - the constitution captures the invariants
    (pinned inputs, host/container closure parity, small independent PRs,
-   etc.) that every prior feature was held to, and this README's Roadmap
-   section is the running changelog of what already exists.
+   etc.) that every prior feature was held to, and `specs/` itself is the
+   running changelog of what already exists (ask an AI harness to
+   summarize it if you want a roadmap-style overview - it's generated on
+   demand rather than hand-maintained here).
 2. **Branch per feature/fix**: `git checkout -b NNN-short-name` off `main`,
    `NNN` one higher than the last `specs/` directory.
 3. **Spec it before coding it**, even for something that feels small:
@@ -677,7 +653,7 @@ their feature, not a one-time write-up:
   `specs/*/tasks.md` checklist against what the code under its "Project
   Structure" section actually does today; a checked-off task whose file no
   longer exists or behaves differently is drift to fix, not to ignore.
-- **The root README itself is part of this loop**: its Roadmap section and
-  the per-environment Installation steps are living documentation too - a
+- **The root README itself is part of this loop**: its Installation steps
+  and every feature section are living documentation too - a
   feature that changes user-facing behavior updates README.md in the same
   PR, same as its spec.
