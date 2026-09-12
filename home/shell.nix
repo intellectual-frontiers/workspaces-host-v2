@@ -23,9 +23,13 @@
   programs.oh-my-posh = {
     enable = true;
     enableFishIntegration = true;
+    # The exact theme from strategy-coach/workspaces-host
+    # (dot_config/oh-my-posh/coach.omp.json), carried over byte-for-byte so
+    # the default prompt styling matches the original repo this project
+    # succeeds, not a new placeholder theme.
     settings = builtins.fromJSON (
       builtins.unsafeDiscardStringContext
-        (builtins.readFile ../themes/oh-my-posh/default.omp.json)
+        (builtins.readFile ../themes/oh-my-posh/coach.omp.json)
     );
   };
 }
