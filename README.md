@@ -124,6 +124,62 @@ which is expected on a brand-new machine — override the placeholder
 identity in [`home/git.nix`](home/git.nix), see
 [the Phase 1 quickstart's "Git identity" section](specs/001-core-flake-home-manager/quickstart.md)).
 
+### 6. Select the Nerd Font in your terminal (required for the prompt's icons)
+
+The prompt theme (`themes/oh-my-posh/coach.omp.json`, ported byte-for-byte
+from the original `workspaces-host` repo) draws its OS/git/language/clock
+icons from Nerd Font private-use-area glyphs. Step 4's activation already
+installed a patched font — `home/fonts.nix` puts **JetBrainsMono Nerd
+Font** into your user profile via `fonts.fontconfig.enable` and
+`pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; }` — but which font
+a *terminal emulator* actually renders with is a per-application GUI
+setting. Nix/home-manager has no single "the terminal" to configure across
+Windows Terminal, GNOME Terminal, iTerm2, etc., so this one step is
+manual, and it's the one that actually makes the icons show up instead of
+tofu boxes (`□`) or `?` glyphs. Do it once per terminal emulator you use
+with this profile:
+
+- **Verify the font is actually installed** first (confirms step 4 worked
+  before you go looking for it in a font picker):
+  ```console
+  $ fc-list | grep "JetBrainsMono Nerd Font Mono"
+  ```
+  You should see several `.ttf` paths under
+  `~/.nix-profile/share/fonts/truetype/NerdFonts/`.
+
+- **Family name to select**: `JetBrainsMono Nerd Font Mono` (short alias:
+  `JetBrainsMono NFM`). Use the **Mono** variant specifically — it forces
+  the icon glyphs to the same fixed width as the text glyphs, which is
+  what keeps the powerline/diamond segments in `coach.omp.json` aligned;
+  the plain `JetBrainsMono Nerd Font` variant gives icons their natural
+  (wider) width and can misalign the prompt.
+
+- **WSL2 (Windows Terminal)**: the font must be installed on the
+  **Windows** side too (WSL2's Linux filesystem fonts aren't visible to
+  Windows' GDI). Grab the same release Nix fetched -
+  [`JetBrainsMono.zip` from `ryanoasis/nerd-fonts` releases](https://github.com/ryanoasis/nerd-fonts/releases) -
+  unzip it, select all the `.ttf` files, right-click → "Install for all
+  users" (or double-click each → Install). Then in Windows Terminal:
+  Settings → Profiles → **Debian** → Appearance → Font face →
+  `JetBrainsMono NFM`.
+
+- **Linux VM / Debian bare metal, GNOME Terminal** (Debian's default):
+  Terminal → Preferences → your profile → Text → uncheck "Use the system
+  fixed-width font" → Custom font → `JetBrainsMono Nerd Font Mono`.
+
+- **Any other terminal emulator** (kitty, Alacritty, Konsole, iTerm2, …):
+  the font is installed and discoverable via fontconfig
+  (`fonts.fontconfig.enable` in `home/fonts.nix` ensures this), so it's
+  just a matter of finding that emulator's font setting and entering the
+  same family name, e.g. `font_family JetBrainsMono Nerd Font Mono` in
+  `kitty.conf`.
+
+- **Confirm it worked**: close and reopen the terminal (font changes
+  rarely apply live) and either look at your actual prompt, or run
+  `oh-my-posh print primary --config ~/.config/oh-my-posh/config.json` -
+  the OS icon, branch icon, and segment separators should render as
+  glyphs, not boxes or `?`.
+
 ---
 
 ### WSL2 (Windows Subsystem for Linux)
@@ -201,7 +257,82 @@ capability - see the same quickstart for the full before/after transcript.
 
 ## Working style
 
-This repository dogtoods spec-driven development via Spec Kit's Claude Code
+This repository dogfoods spec-driven development via Spec Kit's Claude Code
 skills (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`,
 `/speckit-implement`, etc., installed under `.claude/skills/`). See
 `specs/` for feature specs as they land.
+
+## Maintaining this repo with Claude Code
+
+Every phase and fix in this repository so far - the original 7-phase
+rewrite, the theme port, this Nerd Font feature - was designed, implemented,
+verified, and merged by Claude Code, not hand-written and then documented
+after the fact. That's intentional: this repo is meant to keep being
+maintained that way, by whoever picks it up next (human or AI). This
+section is the playbook for doing that, including the part that's easy to
+let rot - keeping the Spec Kit specs honest as the actual code moves on.
+
+### The loop for any change, large or small
+
+1. **Point Claude Code at this README and `.specify/memory/constitution.md`**
+   first if it's a fresh session - the constitution captures the invariants
+   (pinned inputs, host/container closure parity, small independent PRs,
+   etc.) that every prior feature was held to, and this README's Roadmap
+   section is the running changelog of what already exists.
+2. **Branch per feature/fix**: `git checkout -b NNN-short-name` off `main`,
+   `NNN` one higher than the last `specs/` directory.
+3. **Spec it before coding it**, even for something that feels small:
+   - `/speckit-specify` - what changes and why, user stories, acceptance
+     scenarios, explicit edge cases and out-of-scope items (see any
+     `specs/*/spec.md` for the shape).
+   - `/speckit-clarify` - if the ask is ambiguous, resolve it here rather
+     than guessing mid-implementation.
+   - `/speckit-plan` - technical approach, constitution check, files that
+     will change.
+   - `/speckit-tasks` - a checklist scoped to independently-testable user
+     stories, checked off as work actually completes (not pre-checked).
+   - `/speckit-checklist` - for anything with fiddly acceptance criteria
+     worth a dedicated review pass.
+   - `/speckit-implement` - do the work the plan and tasks describe.
+   - `/speckit-analyze` - sanity-check spec/plan/tasks/code consistency
+     before calling a feature done.
+4. **Verify for real, not just "it builds"**: `nix build
+   .#homeConfigurations.default.activationPackage`, an actual activation
+   (`./result/activate` as the profile's configured user), and running the
+   actual command/tool/config being changed - the same standard every
+   `specs/*/tasks.md` verification step already holds itself to. A change
+   that only type-checks is not done.
+5. **Run `nix flake check --all-systems`** before opening a PR.
+6. **One small PR per feature/fix**, merged the same way this project's
+   history was built (direct fast-forward to `main` has been more reliable
+   here than the GitHub merge API) - never a giant multi-phase PR.
+
+### Keeping the Spec Kit specs up to date (don't let them drift)
+
+A spec that no longer matches the code is worse than no spec - it actively
+misleads the next reader, human or AI, who trusts it instead of the diff.
+Treat `specs/NNN-*/{spec.md,plan.md,tasks.md}` as living documents scoped to
+their feature, not a one-time write-up:
+
+- **A follow-up fix to an already-merged feature** (a review comment, a bug
+  found later, a small scope correction) updates that feature's own
+  `tasks.md` (add/check off the task) and, if the change alters behavior or
+  acceptance criteria rather than just fixing a bug in the existing
+  criteria, its `spec.md`/`plan.md` too - in the *same* commit/PR as the
+  code change, not as a separate cleanup pass that may never happen.
+- **A change that doesn't fit any existing feature's scope** gets its own
+  new `specs/NNN-.../` via `/speckit-specify`, the same as any other
+  feature - resist folding an unrelated change into an existing spec just
+  because it's a nearby file (see feature 008's own spec, which exists
+  specifically because a placeholder from feature 001 needed a real,
+  separately-documented correction rather than a silent edit).
+- **When asked to audit freshness** (or periodically, on general
+  principle): run `/speckit-analyze` per feature, or diff each
+  `specs/*/tasks.md` checklist against what the code under its "Project
+  Structure" section actually does today; a checked-off task whose file no
+  longer exists or behaves differently is drift to fix, not to ignore.
+- **The root README itself is part of this loop**: its Roadmap section and
+  the per-environment Installation steps are living documentation too - a
+  feature that changes user-facing behavior (like this one, adding a
+  required manual font-selection step) updates README.md in the same PR,
+  same as its spec.
