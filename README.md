@@ -1,31 +1,40 @@
 # workspaces-host-v2
 
-A declarative, hermetically reproducible "Workspaces Host" engineering
-sandbox — the from-scratch successor to
-[`strategy-coach/workspaces-host`](https://github.com/strategy-coach/workspaces-host),
-rebuilt for an era where AI coding agents (Claude Code, Copilot, Cursor,
-Codex, ...) need environments they can spin up identically on a WSL2/Linux/
-macOS host, in a container, or inside a cloud agent-harness session.
+A ready-to-use engineering sandbox for your own computer. One command
+gives you a configured shell and prompt, git and database credentials
+handled safely, a way to keep many git repositories organized, and a
+growing set of everyday developer tools - all set up identically every
+time, whether that's on your Windows laptop (via WSL), a Linux machine,
+a Mac, inside a container, or in a cloud AI-agent session.
 
-## Why a rewrite
+It's built with **Nix flakes + home-manager**: the whole setup is
+described in code (this repository) rather than a list of manual steps,
+so it rebuilds byte-for-byte the same way anywhere, and a future update
+to it is just a `git pull` plus one command away (see "Keeping your
+sandbox in sync" below).
 
-The previous generation of this repository provisioned a host imperatively:
-`chezmoi apply` plus a Homebrew/pkgx/eget/mise/SDKMAN! install list, mutating
-a persistent machine over time. That model predates AI coding agents and
-doesn't give them what they need — a hermetically reproducible closure that
-is provably identical whether it's applied to a laptop, built into a CI
-image, or handed to a cloud harness session.
+See [`.specify/memory/constitution.md`](.specify/memory/constitution.md)
+for the principles behind these design choices.
 
-This repository replaces that toolchain with **Nix flakes + home-manager**
-as the single reproducibility engine (`flake.lock` pins every input
-byte-for-byte, rather than drifting against whatever a package manager
-resolves today), and builds **OCI images from the same flake outputs** so a
-WSL host, CI, and a cloud agent-harness container are provably the same
-closure.
+## What you get
 
-See [`.specify/memory/constitution.md`](.specify/memory/constitution.md) for
-the principles this project holds itself to, and the roadmap below for
-what's built and what's planned.
+- A configured shell and prompt (fish + oh-my-posh) that looks and
+  behaves the same on every machine you use it on.
+- Git and database credentials handled safely by default, with a simple,
+  documented way to update them from the command line (see "Updating
+  your Git identity, and other secrets, from the CLI" below).
+- `mgit`: clone and update many git repositories into one predictable
+  folder layout under `~/workspaces`, plus tools for making the same
+  change across many of them at once.
+- Compliance and observability tooling (`osquery`, `cnquery`,
+  `steampipe`, `OpenObserve`, `surveilr`) ready to audit the sandbox
+  itself.
+- A Java toolchain, PostgreSQL client tooling, and other everyday CLI
+  tools, all pinned to exact, reproducible versions.
+- The exact same environment available as a container image, for CI or
+  a cloud AI-agent session.
+- A `doctor` command that checks everything is actually working, and an
+  instant rollback if a change ever goes wrong.
 
 ## Roadmap
 
@@ -44,9 +53,9 @@ big-bang rewrite commits.
 | 5 | ✅ | Agent sandboxing (network-egress allowlist) |
 | 6 | ✅ | Workspace profiles (per-persona flake outputs) |
 | 7 | ✅ | Doctor + rollback + CI (`nix flake check`) |
-| 8 | ✅ | Ported the original repo's exact oh-my-posh theme (`coach.omp.json`) byte-for-byte |
+| 8 | ✅ | oh-my-posh prompt theme (git-aware, icon-based segments) |
 | 9 | ✅ | Nerd Font support (installed font + human font-selection instructions) |
-| 10 | ✅ | Workspace repo management (`mgit`, `~/workspaces`) - native port of `strategy-coach/workspaces` |
+| 10 | ✅ | Workspace repo management (`mgit`, `~/workspaces`): clone/update many repos into one governed layout |
 | 11 | ✅ | Compliance & observability tooling (`osquery`, `cnquery`, `steampipe`, `OpenObserve`, `surveilr`) |
 | 12 | ✅ | Bulk multi-repo git tooling (`git-extras`, `git-xargs`) |
 | 13 | ✅ | PostgreSQL credential tooling (`.pgpass`, `.psqlrc`, `pgpass` CLI) |
@@ -55,222 +64,178 @@ big-bang rewrite commits.
 
 ## Installation
 
-These steps take a machine with nothing on it to a working
-`home-manager switch --flake .#default` (Fish, oh-my-posh, direnv, git,
-`specify`/`backlog`/`doctor`/the ported scripts, all on `PATH`). **Debian
-is this project's reference/default distro** — the commands below are
-written for Debian (12 "bookworm" or newer) or Debian-derivatives
-(Ubuntu, etc.); adjust the one `apt` line for a non-Debian base if you're
-not on one.
+This gets you a fully working shell with everything installed and turned
+on. **If you're on Windows, start with the section right below** - that's
+what most people reading this want. Already on Linux or a Mac? Skip
+ahead to "Other platforms."
 
-The steps are identical whether Debian is running under WSL2, inside a
-VM, or directly on bare metal — Nix itself doesn't care. Each target
-below only calls out what's actually different for it.
+A few terms used below, in plain language:
 
-### 1. Prerequisites (all targets)
+- **Nix** is the tool that installs everything here - the shell, the
+  prompt, git setup, every CLI tool - from one description, the same way
+  every time.
+- **A "flake"** is just what this repository is, in Nix's terms: a
+  self-contained description of the whole setup.
+- **"Activating"** means telling Nix to actually apply that setup to your
+  user account.
 
-```console
-$ sudo apt update && sudo apt install -y curl git
-```
+### Windows (via WSL) — start here
 
-### 2. Install Nix
+WSL turns on a real Linux system that runs alongside your normal Windows
+apps - not an emulator, not a virtual machine you have to manage
+yourself. Everything below happens inside that Linux system (a window
+titled "Debian"), except step 1.
 
-Prefer the **multi-user (daemon) install** — it needs `systemd`, which a
-normal VM or bare-metal Debian install already has:
+1. **Open PowerShell as Administrator.** Click Start, type `powershell`,
+   then right-click "Windows PowerShell" in the results and choose "Run
+   as administrator."
+2. **Install WSL with Debian Linux** by running this in that PowerShell
+   window:
+   ```powershell
+   wsl --install -d Debian
+   ```
+   This may ask you to restart your computer. If it does, restart, then
+   continue to the next step.
+3. **Open "Debian"** from the Start menu (search for it if it's not
+   pinned). The first time it opens, it asks you to choose a Linux
+   username and password - these can be anything you like, and are
+   separate from your Windows login.
+4. **From inside that Debian window**, install two small prerequisites:
+   ```console
+   $ sudo apt update && sudo apt install -y curl git
+   ```
+5. **Install Nix**, which installs and manages everything else:
+   ```console
+   $ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+   ```
+   Answer `y`/`yes` to anything it asks. When it finishes, close the
+   Debian window and reopen it so the `nix` command becomes available.
+6. **Turn on the one Nix feature this repository needs** - a single
+   command, no file to find and edit by hand:
+   ```console
+   $ mkdir -p ~/.config/nix
+   $ echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+   ```
+7. **Download and apply this setup:**
+   ```console
+   $ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/workspaces-host-v2
+   $ cd ~/workspaces-host-v2
+   $ nix build .#homeConfigurations.default.activationPackage
+   $ ./result/activate
+   ```
+   This downloads everything the setup needs and can take a few minutes
+   the first time - that's expected.
+8. **Check that it worked:**
+   ```console
+   $ doctor
+   ```
+   Every line should say `PASS`. A `WARN` about your git name/email is
+   normal on a brand-new machine - see "Updating your Git identity, and
+   other secrets, from the CLI" below to fix it.
+9. **(Recommended) install the prompt's icon font** - see "Fonts for the
+   prompt icons" below. It's a couple of extra steps, and the prompt
+   still works without it, just with plain boxes instead of icons.
 
-```console
-$ sh <(curl -L https://nixos.org/nix/install) --daemon
-```
+That's it - from now on, every new Debian/WSL window already has this
+setup active. To pick up future improvements to it, see "Keeping your
+sandbox in sync" below.
 
-Follow the installer's prompt to open a new shell (or `source
-/etc/profile.d/nix.sh`) afterward so `nix` is on `PATH`.
+*Want to build/run this repository's container images inside WSL too?*
+That needs `systemd`, which is left off above to keep this install as
+simple as possible. See "Other platforms" below for the systemd-enabled
+install if you need it.
 
-If `systemd` genuinely isn't available (see the WSL2 note below), use
-the **single-user install** instead — this is the exact fallback this
-project's own development sandbox needed, and it's fully sufficient for
-a single-developer machine:
+### Fonts for the prompt icons
 
-```console
-$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
-```
+The colorful prompt uses small icons (branch name, folder, a clock, ...)
+from a "Nerd Font" - a regular monospace font with extra symbols added.
+Step 7 above already installs the font file itself into your account;
+this step is about telling your actual terminal window to use it, which
+is a setting in the terminal app itself, not something Nix can turn on
+for you.
 
-### 3. Enable flakes (both install modes)
-
-```console
-$ mkdir -p ~/.config/nix
-$ echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-```
-
-(For a multi-user install, this can instead go in `/etc/nix/nix.conf` to
-apply for every user on the machine.)
-
-### 4. Clone this repo and do the first activation
-
-Clone it to `~/workspaces-host-v2` specifically - every profile expects
-its own source at that path by default (`$WORKSPACES_HOST_REPO`, used by
-`workspaces-host-update` and the "you're behind upstream" nudge - see
-"Keeping your sandbox in sync" below). Cloned it somewhere else already?
-Override the variable instead of moving it - see that section.
-
-```console
-$ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/workspaces-host-v2
-$ cd ~/workspaces-host-v2
-$ nix build .#homeConfigurations.default.activationPackage
-$ ./result/activate
-```
-
-This works even before `home-manager` itself is on `PATH` — the first
-activation installs it (via `programs.home-manager.enable`), so every
-activation after this one can just be:
-
-```console
-$ home-manager switch --flake .#default
-```
-
-### 5. Verify
-
-```console
-$ doctor
-```
-
-Every check should report `PASS` (an unset git identity reports `WARN`,
-which is expected on a brand-new machine — override the placeholder
-identity in [`home/git.nix`](home/git.nix), see
-[the Phase 1 quickstart's "Git identity" section](specs/001-core-flake-home-manager/quickstart.md)).
-
-### 6. Select the Nerd Font in your terminal (required for the prompt's icons)
-
-The prompt theme (`themes/oh-my-posh/coach.omp.json`, ported byte-for-byte
-from the original `workspaces-host` repo) draws its OS/git/language/clock
-icons from Nerd Font private-use-area glyphs. Step 4's activation already
-installed a patched font — `home/fonts.nix` puts **JetBrainsMono Nerd
-Font** into your user profile via `fonts.fontconfig.enable` and
-`pkgs.nerdfonts.override { fonts = [ "JetBrainsMono" ]; }` — but which font
-a *terminal emulator* actually renders with is a per-application GUI
-setting. Nix/home-manager has no single "the terminal" to configure across
-Windows Terminal, GNOME Terminal, iTerm2, etc., so this one step is
-manual, and it's the one that actually makes the icons show up instead of
-tofu boxes (`□`) or `?` glyphs. Do it once per terminal emulator you use
-with this profile:
-
-- **Verify the font is actually installed** first (confirms step 4 worked
-  before you go looking for it in a font picker):
+- **Check the font is actually there** first:
   ```console
   $ fc-list | grep "JetBrainsMono Nerd Font Mono"
   ```
-  You should see several `.ttf` paths under
-  `~/.nix-profile/share/fonts/truetype/NerdFonts/`.
+  You should see several `.ttf` file paths printed.
 
-- **Family name to select**: `JetBrainsMono Nerd Font Mono` (short alias:
-  `JetBrainsMono NFM`). Use the **Mono** variant specifically — it forces
-  the icon glyphs to the same fixed width as the text glyphs, which is
-  what keeps the powerline/diamond segments in `coach.omp.json` aligned;
-  the plain `JetBrainsMono Nerd Font` variant gives icons their natural
-  (wider) width and can misalign the prompt.
+- **The exact font name to pick**: `JetBrainsMono Nerd Font Mono` (also
+  shown as `JetBrainsMono NFM` in some menus). Use the **Mono** one
+  specifically - the other variants can make the prompt's icons and text
+  misalign.
 
-- **WSL2 (Windows Terminal)**: the font must be installed on the
-  **Windows** side too (WSL2's Linux filesystem fonts aren't visible to
-  Windows' GDI). Grab the same release Nix fetched -
-  [`JetBrainsMono.zip` from `ryanoasis/nerd-fonts` releases](https://github.com/ryanoasis/nerd-fonts/releases) -
-  unzip it, select all the `.ttf` files, right-click → "Install for all
-  users" (or double-click each → Install). Then in Windows Terminal:
-  Settings → Profiles → **Debian** → Appearance → Font face →
-  `JetBrainsMono NFM`.
+- **On Windows (Windows Terminal)**: the font needs to be installed on
+  the **Windows side** too, not just inside Debian/WSL - Windows can't
+  see fonts that only exist inside the Linux filesystem.
+  1. Download [`JetBrainsMono.zip`](https://github.com/ryanoasis/nerd-fonts/releases)
+     from the Nerd Fonts project (the same one WSL just installed for
+     Linux).
+  2. Unzip it, select all the `.ttf` files, right-click → "Install for
+     all users" (or double-click each file → Install).
+  3. Open Windows Terminal → Settings → Profiles → **Debian** →
+     Appearance → Font face → choose `JetBrainsMono NFM`.
 
-- **Linux VM / Debian bare metal, GNOME Terminal** (Debian's default):
-  Terminal → Preferences → your profile → Text → uncheck "Use the system
+- **On Linux with GNOME Terminal** (the default on Debian): Terminal →
+  Preferences → your profile → Text → uncheck "Use the system
   fixed-width font" → Custom font → `JetBrainsMono Nerd Font Mono`.
 
-- **Any other terminal emulator** (kitty, Alacritty, Konsole, iTerm2, …):
-  the font is installed and discoverable via fontconfig
-  (`fonts.fontconfig.enable` in `home/fonts.nix` ensures this), so it's
-  just a matter of finding that emulator's font setting and entering the
-  same family name, e.g. `font_family JetBrainsMono Nerd Font Mono` in
-  `kitty.conf`.
+- **Any other terminal app** (kitty, Alacritty, Konsole, iTerm2, ...):
+  the font is already installed and discoverable system-wide, so just
+  find that app's own font setting and type in the same name, e.g.
+  `font_family JetBrainsMono Nerd Font Mono` in `kitty.conf`.
 
-- **Confirm it worked**: close and reopen the terminal (font changes
-  rarely apply live) and either look at your actual prompt, or run
-  `oh-my-posh print primary --config ~/.config/oh-my-posh/config.json` -
-  the OS icon, branch icon, and segment separators should render as
-  glyphs, not boxes or `?`.
+- **Check it worked**: close and reopen your terminal window (font
+  changes usually don't apply to windows already open) and look at your
+  prompt - you should see actual icons, not boxes or `?` marks.
 
----
+### Other platforms (Linux or macOS, no WSL)
 
-### WSL2 (Windows Subsystem for Linux)
+Everything above still applies - just skip the Windows-only parts
+(steps 1-3) and use these small adjustments:
 
-1. From an elevated PowerShell on Windows: `wsl --install -d Debian`
-   (installs WSL2 itself if it isn't already, plus a Debian distro).
-2. Launch "Debian" from the Start menu and create your Unix user when
-   prompted.
-3. **Enable `systemd`** (needed for the multi-user Nix install, and for
-   `docker`/`dockerd` if you plan to build/run this flake's OCI images
-   inside WSL2 too): create or edit `/etc/wsl.conf` inside the Debian
-   shell:
-   ```console
-   $ sudo tee /etc/wsl.conf >/dev/null <<'EOF'
-   [boot]
-   systemd=true
-   EOF
-   ```
-   Then, from PowerShell: `wsl --shutdown`, and reopen the Debian shell.
-4. Follow steps 1-5 above from inside that Debian shell.
+**Linux (a VM, or directly on a real machine), Debian or a Debian-based
+distro (Ubuntu, etc.):**
 
-If you'd rather not touch `wsl.conf`, the single-user Nix install (step
-2's fallback above) works in WSL2 without `systemd` too.
+- Start straight at step 4 (`apt install`) - just open a regular
+  terminal.
+- In step 5, use the daemon-based install instead, since real Linux
+  already has `systemd` (this is a small quality-of-life improvement,
+  not required):
+  ```console
+  $ sh <(curl -L https://nixos.org/nix/install) --daemon
+  ```
+- Want to build/run this repository's container images? Also install
+  Docker: `sudo apt install -y docker.io` (or see
+  [docs.docker.com](https://docs.docker.com/engine/install/debian/) for
+  another distro's package).
+- Everything else (steps 4, 6-9) is identical.
 
-### Linux VM (any hypervisor)
+**macOS:**
 
-Any VM running Debian (via VirtualBox, UTM, Multipass, a cloud provider's
-Debian image, etc.) already has `systemd` — just follow steps 1-5 above
-with no changes. If you plan to build/run this flake's OCI images
-(`packages.<system>.oci-image*`) inside the VM, also install Docker
-(`sudo apt install -y docker.io` on Debian, or see
-[docs.docker.com](https://docs.docker.com/engine/install/debian/) for the
-upstream package).
+- Skip the `apt install` in step 4 too - macOS already has `curl`/`git`
+  (or get them via Homebrew or the Xcode Command Line Tools).
+- Step 5's installer works the same way on macOS, Apple Silicon or
+  Intel:
+  ```console
+  $ sh <(curl -L https://nixos.org/nix/install)
+  ```
+- In step 7, macOS's setup isn't called `default` - use your actual
+  system name everywhere a command below says `default`:
+  ```console
+  $ nix build .#homeConfigurations.aarch64-darwin.activationPackage   # Apple Silicon
+  $ nix build .#homeConfigurations.x86_64-darwin.activationPackage    # Intel
+  $ ./result/activate
+  $ home-manager switch --flake .#aarch64-darwin   # for future updates
+  ```
+- A handful of pieces (container sandboxing, and any tool that only
+  exists for Linux) aren't installed on macOS - everything else is
+  identical.
 
-### Debian bare metal
-
-Same as the VM case — steps 1-5, no changes. This is the most direct
-path: no virtualization layer, no WSL translation layer, just Debian and
-Nix.
-
-### macOS
-
-This flake genuinely supports macOS (`x86_64-darwin`/`aarch64-darwin` are
-both in `flake.nix`'s `systems` list and get their own `homeConfigurations`
-and CI checks, not just Linux) - it's just been undocumented until now.
-
-Nix's own installer (step 2 above) supports macOS the same way, both
-Apple Silicon and Intel:
-
-```console
-$ sh <(curl -L https://nixos.org/nix/install)
-```
-
-Follow steps 3-6 above with **one change**: `default` specifically aliases
-`x86_64-linux` (see `flake.nix`) - on macOS, use your actual system
-instead of `default` everywhere a command references it:
-
-```console
-$ nix build .#homeConfigurations.aarch64-darwin.activationPackage   # Apple Silicon
-$ nix build .#homeConfigurations.x86_64-darwin.activationPackage    # Intel
-$ ./result/activate
-$ home-manager switch --flake .#aarch64-darwin   # subsequent activations
-```
-
-`home.homeDirectory` is already `/Users/workspace` on Darwin (`flake.nix`
-handles this per-system). A small number of pieces are Linux-only by
-nature (container sandboxing - `init-firewall`/`oci-image-sandboxed` - and
-any tool nixpkgs itself restricts to Linux) and are already excluded from
-Darwin builds at the flake level; everything else works the same.
-
-### Windows (native, without WSL2)
-
-Not supported, and can't be: Nix has no native Windows/NT port - it
-requires a POSIX-like kernel (Linux or Darwin) or WSL2's Linux kernel
-underneath. **WSL2 (above) is the only Windows path this flake
-supports** - it's real Linux, not an emulation layer, so everything in
-this README applies unchanged once you're inside it.
+**Windows without WSL:** not possible, and there's nothing to document -
+Nix needs a real Linux or macOS system underneath it, and WSL (above) is
+exactly that (genuine Linux, not an emulator), so it's the only Windows
+path.
 
 ## Quickstart
 
@@ -280,13 +245,10 @@ smoke test.
 
 ## Managing your `~/workspaces` repos (`mgit`)
 
-The original `strategy-coach/workspaces-host` relied on a *separate* repo,
-[`strategy-coach/workspaces`](https://github.com/strategy-coach/workspaces),
-for the actual "clone my repos into a governed `~/workspaces` layout"
-strategy (its `mgit.ts`/`ws-ensure.ts` Deno scripts). That functionality is
-now native to this repo - every profile installs an `mgit` command and
-bootstraps `~/workspaces` on activation, so there's no second repo to clone
-or a Deno runtime to install just to get your repos onto disk.
+`mgit` clones and updates your git repositories into one predictable
+folder layout under `~/workspaces`. Every profile installs the `mgit`
+command and creates `~/workspaces` automatically on activation - there's
+nothing extra to install to get your repos organized.
 
 ### The governed directory convention
 
@@ -374,20 +336,15 @@ Example `my.mgit.code-workspace`, checked into a repo `mgit` manages:
 ### Bulk changes across many repos (`git-extras`, `git-xargs`)
 
 `mgit` (above) governs *which* repos land under `~/workspaces`; these two
-tools are for making the same change *across* many of them at once, the
-original README's other named git tooling:
+tools are for making the same change *across* many of them at once:
 
 - **`git-extras`** - a grab-bag of everyday `git <cmd>` subcommands
   (`git summary`, `git changelog`, `git effort`, `git delete-merged-branches`,
-  ...) this project treats as baseline, always-installed tooling, the same
-  as the original repo did.
+  ...), installed by default.
 - **`git-xargs`** ([gruntwork-io/git-xargs](https://github.com/gruntwork-io/git-xargs)) -
   run a command, or a small Go callback, against many GitHub repos in one
-  shot and open a PR with the results in each. The original repo left
-  this opt-in ("not installed by default but... let us know and we'll
-  have it installed as a standard package"); this rewrite consolidates
-  optional standard tooling, so it's installed by default here instead.
-  A natural fit once you have several repos under `~/workspaces` (via
+  shot and open a PR with the results in each. Installed by default, and
+  a natural fit once you have several repos under `~/workspaces` (via
   `mgit`) and want to land the same fix in all of them:
   ```console
   $ git-xargs --repos repo1,repo2,repo3 --branch-name my-fix --commit-message "my fix" -- ./my-script.sh
@@ -402,8 +359,8 @@ Every profile ships `~/.psqlrc` (a full `psql` client config - colored
 prompt, sane defaults, and a set of `\set` admin queries like `settings`,
 `locks`, `dbsize`, `tablesize`) and bootstraps an empty `~/.pgpass` (mode
 `600`, as `libpq` requires or it silently ignores the file) on first
-activation - both ported from the original repo, `.pgpass` deliberately
-left for you to fill in rather than generated with real credentials.
+activation - `~/.pgpass` deliberately starts out empty for you to fill in
+rather than pre-populated with anything.
 
 Add connections to `~/.pgpass` using a small comment-header convention -
 one JSON-like descriptor line before each `hostname:port:database:username:password`
@@ -415,8 +372,8 @@ $ cat ~/.pgpass
 192.168.2.24:5432:pgDB_name:pgDB_username:sup3rSecure!
 ```
 
-Then look connections up by `id` with the `pgpass` command (a native port
-of `netspective-labs/sql-aide`'s `pgpass.ts`, covering its most-used
+Then look connections up by `id` with the `pgpass` command (inspired by
+`netspective-labs/sql-aide`'s `pgpass.ts`, covering its most-used
 subcommands):
 
 ```console
@@ -433,13 +390,10 @@ once, prefixed by each connection's own `id`).
 
 ## Compliance & observability tooling
 
-The original `workspaces-host` treated the sandbox itself as a service you
-can audit for SOC2 and similar compliance requirements, using `osquery`,
-`cnquery`, and `steampipe` for endpoint/system observability plus
-`OpenObserve` for metrics/tracing/logging, and `surveilr` (from
-`surveilr/packages`, installed there via `eget`) to capture that state as
-evidence. Every profile installs all five on `PATH`, so there's nothing
-extra to opt into:
+This sandbox includes tooling for auditing itself - useful for SOC2 and
+similar compliance requirements, or just for understanding what's
+actually running on the machine. Every profile installs all five, ready
+to use with nothing extra to opt into:
 
 - **`osqueryi`** (interactive) / `osqueryd` (daemon) - SQL-queryable
   operating-system instrumentation (processes, open files, listening
@@ -477,18 +431,16 @@ reach for, not background daemons this repository starts for you.
 ## Java toolchain
 
 Every profile installs a JDK (`java`) and Maven (`mvn`), with `JAVA_HOME`
-already set - no separate version manager needed.
+already set - no separate version manager needed. Nix itself already
+pins reproducible versions for every tool in this setup, Java included,
+so a second version manager on top of it would just duplicate that job.
 
-The original repo used SDKMAN! to install a JDK/Maven per-engineer,
-opt-in, via a `setup-java-amazon-corretto` fish function. This repo is
-already built on a real, pinned version manager - Nix itself - so a
-second one on top would just duplicate that job. If you need a different
-JDK version or vendor than the one nixpkgs pins here, override
-`home/java.nix`'s `pkgs.jdk`/`pkgs.maven` in a fork (e.g. `pkgs.temurin-bin`
-for a specific Temurin release), the same override pattern as every other
-opinionated default in this repo (git identity, the Nerd Font choice,
-etc.) - see `specs/015-java-toolchain/spec.md` for the exact packages
-this pins today.
+If you need a different JDK version or vendor than the one nixpkgs pins
+here, override `home/java.nix`'s `pkgs.jdk`/`pkgs.maven` in a fork (e.g.
+`pkgs.temurin-bin` for a specific Temurin release), the same override
+pattern as every other default in this repo (git identity, the Nerd
+Font choice, etc.) - see `specs/015-java-toolchain/spec.md` for the exact
+packages this pins today.
 
 ## Keeping your sandbox in sync
 
@@ -537,85 +489,88 @@ switch` for you. Applying a change is always your own explicit
 since a `home-manager switch` can restructure your shell/prompt/tool
 environment and shouldn't happen unattended.
 
-## Secrets & credential hygiene
+## Updating your Git identity, and other secrets, from the CLI
 
-A few habits keep real credentials out of git history entirely, plus how
-to use this repo's own tooling (`home/secrets.nix`'s `workspacesHost.secrets`,
-`direnv`) so CLI tools read short-lived tokens from the environment
-instead of a config file or shell rc that might get committed by accident.
+### Your name and email (git identity)
 
-### Never commit a secret in the first place
+This setup writes `~/.gitconfig` for you from a file inside this
+repository, so editing `~/.gitconfig` by hand gets silently overwritten
+the next time you sync (see "Keeping your sandbox in sync" above).
+Change your name/email here instead, with one command:
 
-- Keep `.env`, `*.pgpass`, and any real credential file in your project's
-  `.gitignore` - not this repo's (per-project, since every project's
-  secrets are different).
-- Before committing, skim what's actually staged - `git diff --staged` -
-  especially after a broad `git add`. A filename looking innocuous
-  (`config.json`, `notes.txt`) is not proof its contents are safe to
-  publish.
-- `gitleaks` is installed by every profile. Run it against a repo before
-  a big commit or push, or as a habit:
+```console
+$ sed -i 's/Workspace Engineer/Your Name/; s/workspace@example.invalid/you@example.com/' ~/workspaces-host-v2/home/git.nix
+$ workspaces-host-update
+```
+
+Replace `Your Name` and `you@example.com` with your own, then run it.
+`doctor`'s `WARN` about your git identity goes away once this is applied.
+
+### Database passwords (`~/.pgpass`)
+
+See "PostgreSQL credentials" above - `~/.pgpass` is a plain text file, one
+line per connection (`hostname:port:database:username:password`) with a
+short description above it. Add to it directly from the CLI:
+
+```console
+$ cat >> ~/.pgpass <<'EOF'
+# { id: "MYDB", description: "My database", boundary: "Local" }
+localhost:5432:mydb:myuser:mypassword
+EOF
+```
+
+### GitHub/GitLab tokens, and other secrets that expire
+
+Two habits keep real credentials out of git history entirely:
+
+- Keep `.env` and any real credential file in your *project's own*
+  `.gitignore` (not this repository's - every project's secrets are
+  different).
+- Before committing, check what's actually staged - `git diff --staged` -
+  especially after a broad `git add`. `gitleaks` is installed and ready
+  to scan a repo for anything that looks like a secret:
   ```console
   $ gitleaks detect --source . -v
   ```
-- If a secret does get committed, rotating it is mandatory - removing it
-  from a later commit does not remove it from git history (anyone with a
-  clone still has it via `git log -p`).
 
-### Short-lived tokens instead of long-lived ones in config files
+For a GitHub/GitLab token (or any secret a CLI tool needs), this is the
+simplest safe way to handle it:
 
-Don't put a GitHub/GitLab personal access token into `~/.gitconfig`,
-`gh`'s own credential store persisted forever, or a shell rc file. Prefer
-a **short-expiry** token (GitHub fine-grained PATs and GitLab project
-access tokens both support setting an expiration) delivered to a CLI tool
-**only as an environment variable, only in the directory that needs it**,
-using this repo's existing `sops`/`age` + `direnv` stack
-(`home/secrets.nix`, `home/direnv.nix` - see the Phase 4 quickstart,
-[`specs/004-secrets-management/quickstart.md`](specs/004-secrets-management/quickstart.md),
-for the full encrypt/decrypt walkthrough):
-
-1. Encrypt the token once, wherever you keep your encrypted secrets files:
+1. **Get a short-lived token** from GitHub/GitLab (both let you set an
+   expiration date when you create one) instead of a permanent one.
+2. **Encrypt it once**, using the `age`/`sops` tools this setup already
+   installs:
    ```console
-   $ echo -n "ghp_yourShortLivedToken" | sops --encrypt --age <your-age-pubkey> /dev/stdin > github-token.enc.yaml
+   $ echo -n "ghp_yourToken" | sops --encrypt --age <your-age-public-key> /dev/stdin > github-token.enc.yaml
    ```
-2. Declare it in your home-manager config:
+3. **Tell this setup about it**, in your home-manager config:
    ```nix
    workspacesHost.secrets.github-token = {
      sopsFile = ./github-token.enc.yaml;
      path = "github-token";
    };
    ```
-   `home-manager switch` decrypts it to
-   `~/.local/state/workspaces-host/secrets/github-token` (mode 600, never
-   in `/nix/store`) on every activation.
-3. In the *project* that needs it, add a `.envrc` (direnv - already
-   enabled by every profile) that loads it only while you're in that
-   directory:
+   Run `workspaces-host-update` (or `home-manager switch`) and the real
+   value lands at `~/.local/state/workspaces-host/secrets/github-token` -
+   readable only by you, never in a file you'd accidentally commit.
+4. **Use it only where you need it.** In that one project, add a
+   `.envrc` (this setup already turns on `direnv`, which loads and
+   unloads environment variables automatically as you move in and out
+   of a folder):
    ```console
    $ echo 'export GITHUB_TOKEN=$(cat ~/.local/state/workspaces-host/secrets/github-token)' >> .envrc
    $ direnv allow
    ```
-   Now `gh`, `git` (via `GITHUB_TOKEN`-aware credential helpers), or any
-   tool that reads `$GITHUB_TOKEN` picks it up automatically inside that
-   directory, and direnv unloads it the moment you `cd` out - it never
-   lingers in an unrelated shell. The same pattern works for
-   `GITLAB_TOKEN`/`glab`, cloud provider tokens, etc.
+   Now any tool that reads `$GITHUB_TOKEN` (like `gh`) sees it
+   automatically inside that folder, and it disappears the moment you
+   leave. The same steps work for `GITLAB_TOKEN`, a cloud provider
+   token, or anything else.
 
-### When a token expires or a secret needs rotating
-
-Nothing in this flow changes - only the encrypted file's content:
-
-```console
-$ echo -n "ghp_yourNewToken" | sops --encrypt --age <your-age-pubkey> /dev/stdin > github-token.enc.yaml
-$ home-manager switch --flake .#default   # or: workspaces-host-update
-```
-
-The next activation decrypts the new value to the same path; every
-`.envrc` referencing it picks up the new token the next time direnv
-reloads (entering the directory again, or `direnv reload`) - no code
-change, no re-declaring the secret, no old plaintext left behind (the
-decrypted file at `~/.local/state/workspaces-host/secrets/...` is
-overwritten in place on each activation).
+**When a token expires or needs rotating**: repeat step 2 with the new
+value, then run `workspaces-host-update` again. Everything else - the
+decrypted file, every `.envrc` that reads it - picks up the new value
+automatically; there's no code to change and no old plaintext left
+behind.
 
 ## Health check & rollback
 
@@ -642,9 +597,9 @@ $ home-manager generations
 $ /nix/store/...-home-manager-generation/activate   # re-activate an older one
 ```
 
-This is a real, verified rollback (a two-generation activate/rollback
-cycle was exercised during Phase 7's implementation), not a theoretical
-capability - see the same quickstart for the full before/after transcript.
+This is a real, tested rollback (a two-generation activate/rollback cycle
+was exercised during development), not a theoretical capability - see the
+same quickstart for the full before/after transcript.
 
 ## Working style
 
@@ -655,8 +610,7 @@ skills (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`,
 
 ## Maintaining this repo with Claude Code
 
-Every phase and fix in this repository so far - the original 7-phase
-rewrite, the theme port, this Nerd Font feature - was designed, implemented,
+Every feature in this repository so far was designed, implemented,
 verified, and merged by Claude Code, not hand-written and then documented
 after the fact. That's intentional: this repo is meant to keep being
 maintained that way, by whoever picks it up next (human or AI). This
@@ -714,9 +668,7 @@ their feature, not a one-time write-up:
 - **A change that doesn't fit any existing feature's scope** gets its own
   new `specs/NNN-.../` via `/speckit-specify`, the same as any other
   feature - resist folding an unrelated change into an existing spec just
-  because it's a nearby file (see feature 008's own spec, which exists
-  specifically because a placeholder from feature 001 needed a real,
-  separately-documented correction rather than a silent edit).
+  because it's a nearby file.
 - **When asked to audit freshness** (or periodically, on general
   principle): run `/speckit-analyze` per feature, or diff each
   `specs/*/tasks.md` checklist against what the code under its "Project
@@ -724,6 +676,5 @@ their feature, not a one-time write-up:
   longer exists or behaves differently is drift to fix, not to ignore.
 - **The root README itself is part of this loop**: its Roadmap section and
   the per-environment Installation steps are living documentation too - a
-  feature that changes user-facing behavior (like this one, adding a
-  required manual font-selection step) updates README.md in the same PR,
-  same as its spec.
+  feature that changes user-facing behavior updates README.md in the same
+  PR, same as its spec.
