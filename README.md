@@ -44,6 +44,9 @@ big-bang rewrite commits.
 | 5 | ✅ | Agent sandboxing (network-egress allowlist) |
 | 6 | ✅ | Workspace profiles (per-persona flake outputs) |
 | 7 | ✅ | Doctor + rollback + CI (`nix flake check`) |
+| 8 | ✅ | Ported the original repo's exact oh-my-posh theme (`coach.omp.json`) byte-for-byte |
+| 9 | ✅ | Nerd Font support (installed font + human font-selection instructions) |
+| 10 | ✅ | Workspace repo management (`mgit`, `~/workspaces`) - native port of `strategy-coach/workspaces` |
 
 ## Installation
 
@@ -225,6 +228,99 @@ Nix.
 See [`specs/001-core-flake-home-manager/quickstart.md`](specs/001-core-flake-home-manager/quickstart.md)
 for the verified `nix flake check` / `home-manager switch --flake .#default`
 smoke test.
+
+## Managing your `~/workspaces` repos (`mgit`)
+
+The original `strategy-coach/workspaces-host` relied on a *separate* repo,
+[`strategy-coach/workspaces`](https://github.com/strategy-coach/workspaces),
+for the actual "clone my repos into a governed `~/workspaces` layout"
+strategy (its `mgit.ts`/`ws-ensure.ts` Deno scripts). That functionality is
+now native to this repo - every profile installs an `mgit` command and
+bootstraps `~/workspaces` on activation, so there's no second repo to clone
+or a Deno runtime to install just to get your repos onto disk.
+
+### The governed directory convention
+
+Every repo `mgit` manages lives at
+`~/workspaces/<git-host>/<org-or-group>/.../<repo>` - the exact same path
+segments as the repo's own HTTPS clone URL, so the layout is predictable
+and greppable no matter how many git hosts or orgs you work across:
+
+```text
+~/workspaces
+├── github.com
+│   ├── your-org
+│   │   └── some-repo
+│   └── another-org
+│       └── another-repo
+└── gitlab.example.com
+    └── group
+        └── subgroup
+            └── repo
+```
+
+### Declaring which repos to track
+
+`mgit ensure` reads a small JSON config at `~/workspaces/mgit.json` -
+home-manager creates this file (and the `~/workspaces` directory itself)
+once, empty, on first activation, and never touches it again, so your
+choices persist across every future `home-manager switch`. Edit it to add
+repos:
+
+```console
+$ cat ~/workspaces/mgit.json
+{
+  "repos": [
+    { "repo": "github.com/your-org/some-repo" },
+    { "repo": "github.com/your-org/other-repo", "fresh": true }
+  ]
+}
+```
+
+- `repo` is the host/org/repo path (no `https://` scheme) - the exact
+  string mgit also uses as the on-disk path under `~/workspaces`.
+- `"fresh": true` deletes and re-clones that repo on the next `ensure`
+  instead of pulling (useful for a one-off "start this one over"; leave it
+  off, or `false`, for normal day-to-day use).
+
+### Running it
+
+```console
+$ mgit ensure     # clone anything new, `git pull --quiet` anything that exists - safe to run as often as you like
+$ mgit status     # git status (dirty/ahead/behind/no-upstream) across every repo under ~/workspaces
+$ mgit inspect    # list git hosts and repos referenced by *.mgit.code-workspace files
+```
+
+`mgit ensure` is fully idempotent - run it once a day, once an hour,
+whatever you like; it only clones what's missing and quietly pulls
+everything else.
+
+### VS Code multi-root "monorepo" composition (optional)
+
+If a repo `mgit` clones contains a `*.mgit.code-workspace` file (VS Code's
+multi-root workspace format), `mgit ensure` automatically:
+
+1. Symlinks that file to the root of `~/workspaces`, so you can open it
+   directly in VS Code from one place regardless of which repo it lives in.
+2. Reads its `folders[].path` entries and treats each one as another
+   `mgit`-managed repo path, cloning/pulling it too - recursively, so
+   repos can depend on other repos' workspace files without you having to
+   list every transitive dependency in `mgit.json` yourself.
+
+This lets several independent repos - potentially from different git
+hosts or orgs - present themselves as one composed "monorepo" in the
+editor, entirely via relative paths, with no submodules and no vendoring.
+Example `my.mgit.code-workspace`, checked into a repo `mgit` manages:
+
+```json
+{
+  "folders": [
+    { "path": "github.com/your-org/some-repo" },
+    { "path": "github.com/your-org/other-repo" },
+    { "path": "gitlab.example.com/group/subgroup/repo" }
+  ]
+}
+```
 
 ## Health check & rollback
 
