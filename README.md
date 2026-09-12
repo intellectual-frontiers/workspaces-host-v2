@@ -47,6 +47,7 @@ big-bang rewrite commits.
 | 8 | ✅ | Ported the original repo's exact oh-my-posh theme (`coach.omp.json`) byte-for-byte |
 | 9 | ✅ | Nerd Font support (installed font + human font-selection instructions) |
 | 10 | ✅ | Workspace repo management (`mgit`, `~/workspaces`) - native port of `strategy-coach/workspaces` |
+| 12 | ✅ | Bulk multi-repo git tooling (`git-extras`, `git-xargs`) |
 
 ## Installation
 
@@ -365,6 +366,31 @@ Example `my.mgit.code-workspace`, checked into a repo `mgit` manages:
   ]
 }
 ```
+
+### Bulk changes across many repos (`git-extras`, `git-xargs`)
+
+`mgit` (above) governs *which* repos land under `~/workspaces`; these two
+tools are for making the same change *across* many of them at once, the
+original README's other named git tooling:
+
+- **`git-extras`** - a grab-bag of everyday `git <cmd>` subcommands
+  (`git summary`, `git changelog`, `git effort`, `git delete-merged-branches`,
+  ...) this project treats as baseline, always-installed tooling, the same
+  as the original repo did.
+- **`git-xargs`** ([gruntwork-io/git-xargs](https://github.com/gruntwork-io/git-xargs)) -
+  run a command, or a small Go callback, against many GitHub repos in one
+  shot and open a PR with the results in each. The original repo left
+  this opt-in ("not installed by default but... let us know and we'll
+  have it installed as a standard package"); this rewrite consolidates
+  optional standard tooling, so it's installed by default here instead.
+  A natural fit once you have several repos under `~/workspaces` (via
+  `mgit`) and want to land the same fix in all of them:
+  ```console
+  $ git-xargs --repos repo1,repo2,repo3 --branch-name my-fix --commit-message "my fix" -- ./my-script.sh
+  ```
+  See its own README for the full flag set (repo selection via
+  `--repos`/`--repo-file`/a GitHub org, dry-run mode, PR title/body,
+  etc.) - this repo just makes sure the binary is on `PATH`.
 
 ## PostgreSQL credentials (`~/.pgpass`, `~/.psqlrc`, `pgpass`)
 
