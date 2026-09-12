@@ -67,9 +67,21 @@ fi
 
 echo
 echo "-- Ported CLI tools (home.packages) --"
-for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl pgpass; do
+for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl pgpass gitleaks workspaces-host-update; do
     check_cmd "$c"
 done
+
+echo
+echo "-- Sandbox sync (workspaces-host-update) --"
+if [ -n "${WORKSPACES_HOST_REPO:-}" ]; then
+    if [ -d "$WORKSPACES_HOST_REPO/.git" ]; then
+        pass "\$WORKSPACES_HOST_REPO ($WORKSPACES_HOST_REPO) is a git clone - 'workspaces-host-update' will work"
+    else
+        warn "\$WORKSPACES_HOST_REPO ($WORKSPACES_HOST_REPO) is not a git clone yet - clone workspaces-host-v2 there, or override the variable"
+    fi
+else
+    warn "\$WORKSPACES_HOST_REPO is not set (did home-manager switch run?)"
+fi
 
 echo
 echo "-- Workspace repo management (~/workspaces, mgit) --"

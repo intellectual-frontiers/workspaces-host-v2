@@ -101,9 +101,15 @@ apply for every user on the machine.)
 
 ### 4. Clone this repo and do the first activation
 
+Clone it to `~/workspaces-host-v2` specifically - every profile expects
+its own source at that path by default (`$WORKSPACES_HOST_REPO`, used by
+`workspaces-host-update` and the "you're behind upstream" nudge - see
+"Keeping your sandbox in sync" below). Cloned it somewhere else already?
+Override the variable instead of moving it - see that section.
+
 ```console
-$ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git
-$ cd workspaces-host-v2
+$ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/workspaces-host-v2
+$ cd ~/workspaces-host-v2
 $ nix build .#homeConfigurations.default.activationPackage
 $ ./result/activate
 ```
@@ -356,6 +362,133 @@ $ pgpass url --conn-id=MYDB                    # postgres://user:pass@host:port/
 `--conn-id` takes an extended regex, so `--conn-id=".*"` matches every
 connection (useful with `env` to export every connection's variables at
 once, prefixed by each connection's own `id`).
+
+## Keeping your sandbox in sync
+
+New features and fixes land on this repo's `main` the same way everything
+in the Roadmap table did - small, independent, merged PRs. Your machine
+doesn't pick those up by itself; here's how to stay current.
+
+### The manual way (always works)
+
+```console
+$ cd ~/workspaces-host-v2   # or wherever $WORKSPACES_HOST_REPO points
+$ git pull
+$ home-manager switch --flake .#default   # or your profile
+```
+
+### The one-command way
+
+Every profile installs `workspaces-host-update`, which does exactly that:
+
+```console
+$ workspaces-host-update
+```
+
+It reads two environment variables (both have sane defaults, override
+either in a fork or via `home.sessionVariables` if you need to):
+
+- `WORKSPACES_HOST_REPO` (default `~/workspaces-host-v2`) - where this
+  repo is cloned.
+- `WORKSPACES_HOST_PROFILE` (default `default`) - which flake profile to
+  switch to (`default`, or a persona like `backend`).
+
+### The nudge (so you actually remember to)
+
+Every profile's fish config checks, once per day, in the background
+(never blocking shell startup, and silently skipped if there's no
+network), whether `$WORKSPACES_HOST_REPO`'s `origin/main` has moved. If
+it has, your next new shell prints:
+
+```text
+workspaces-host-v2: 3 commit(s) behind origin/main - run workspaces-host-update to pick up new features
+```
+
+This is informational only - it never runs `git pull` or `home-manager
+switch` for you. Applying a change is always your own explicit
+`workspaces-host-update` (or the manual two-liner above), never automatic,
+since a `home-manager switch` can restructure your shell/prompt/tool
+environment and shouldn't happen unattended.
+
+## Secrets & credential hygiene
+
+A few habits keep real credentials out of git history entirely, plus how
+to use this repo's own tooling (`home/secrets.nix`'s `workspacesHost.secrets`,
+`direnv`) so CLI tools read short-lived tokens from the environment
+instead of a config file or shell rc that might get committed by accident.
+
+### Never commit a secret in the first place
+
+- Keep `.env`, `*.pgpass`, and any real credential file in your project's
+  `.gitignore` - not this repo's (per-project, since every project's
+  secrets are different).
+- Before committing, skim what's actually staged - `git diff --staged` -
+  especially after a broad `git add`. A filename looking innocuous
+  (`config.json`, `notes.txt`) is not proof its contents are safe to
+  publish.
+- `gitleaks` is installed by every profile. Run it against a repo before
+  a big commit or push, or as a habit:
+  ```console
+  $ gitleaks detect --source . -v
+  ```
+- If a secret does get committed, rotating it is mandatory - removing it
+  from a later commit does not remove it from git history (anyone with a
+  clone still has it via `git log -p`).
+
+### Short-lived tokens instead of long-lived ones in config files
+
+Don't put a GitHub/GitLab personal access token into `~/.gitconfig`,
+`gh`'s own credential store persisted forever, or a shell rc file. Prefer
+a **short-expiry** token (GitHub fine-grained PATs and GitLab project
+access tokens both support setting an expiration) delivered to a CLI tool
+**only as an environment variable, only in the directory that needs it**,
+using this repo's existing `sops`/`age` + `direnv` stack
+(`home/secrets.nix`, `home/direnv.nix` - see the Phase 4 quickstart,
+[`specs/004-secrets-management/quickstart.md`](specs/004-secrets-management/quickstart.md),
+for the full encrypt/decrypt walkthrough):
+
+1. Encrypt the token once, wherever you keep your encrypted secrets files:
+   ```console
+   $ echo -n "ghp_yourShortLivedToken" | sops --encrypt --age <your-age-pubkey> /dev/stdin > github-token.enc.yaml
+   ```
+2. Declare it in your home-manager config:
+   ```nix
+   workspacesHost.secrets.github-token = {
+     sopsFile = ./github-token.enc.yaml;
+     path = "github-token";
+   };
+   ```
+   `home-manager switch` decrypts it to
+   `~/.local/state/workspaces-host/secrets/github-token` (mode 600, never
+   in `/nix/store`) on every activation.
+3. In the *project* that needs it, add a `.envrc` (direnv - already
+   enabled by every profile) that loads it only while you're in that
+   directory:
+   ```console
+   $ echo 'export GITHUB_TOKEN=$(cat ~/.local/state/workspaces-host/secrets/github-token)' >> .envrc
+   $ direnv allow
+   ```
+   Now `gh`, `git` (via `GITHUB_TOKEN`-aware credential helpers), or any
+   tool that reads `$GITHUB_TOKEN` picks it up automatically inside that
+   directory, and direnv unloads it the moment you `cd` out - it never
+   lingers in an unrelated shell. The same pattern works for
+   `GITLAB_TOKEN`/`glab`, cloud provider tokens, etc.
+
+### When a token expires or a secret needs rotating
+
+Nothing in this flow changes - only the encrypted file's content:
+
+```console
+$ echo -n "ghp_yourNewToken" | sops --encrypt --age <your-age-pubkey> /dev/stdin > github-token.enc.yaml
+$ home-manager switch --flake .#default   # or: workspaces-host-update
+```
+
+The next activation decrypts the new value to the same path; every
+`.envrc` referencing it picks up the new token the next time direnv
+reloads (entering the directory again, or `direnv reload`) - no code
+change, no re-declaring the secret, no old plaintext left behind (the
+decrypted file at `~/.local/state/workspaces-host/secrets/...` is
+overwritten in place on each activation).
 
 ## Health check & rollback
 

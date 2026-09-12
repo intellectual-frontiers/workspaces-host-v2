@@ -1,0 +1,27 @@
+#!/bin/sh
+# workspaces-host-update: pull the latest workspaces-host-v2 and
+# re-activate, so new features/fixes merged upstream land on this
+# machine. One command instead of remembering "cd, git pull,
+# home-manager switch --flake ...".
+set -eu
+
+REPO="${WORKSPACES_HOST_REPO:-$HOME/workspaces-host-v2}"
+PROFILE="${WORKSPACES_HOST_PROFILE:-default}"
+
+if [ ! -d "$REPO/.git" ]; then
+    cat >&2 <<EOF
+workspaces-host-update: no git repo at $REPO
+
+Set WORKSPACES_HOST_REPO to wherever you cloned workspaces-host-v2 (e.g.
+in your fish config: set -gx WORKSPACES_HOST_REPO ~/path/to/workspaces-host-v2),
+or clone it to the default location:
+  git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git "$REPO"
+EOF
+    exit 1
+fi
+
+echo "workspaces-host-update: pulling $REPO ..." >&2
+git -C "$REPO" pull --ff-only
+
+echo "workspaces-host-update: switching to $PROFILE ..." >&2
+exec home-manager switch --flake "$REPO#$PROFILE"
