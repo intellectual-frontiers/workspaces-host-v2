@@ -67,7 +67,7 @@ fi
 
 echo
 echo "-- Ported CLI tools (home.packages) --"
-for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl pgpass gitleaks workspaces-host-update; do
+for c in semtag mgitstatus mgit git-standup specify backlog scaffold-agent-harness sensitivectl pgpass gitleaks workspaces-host-update git-extras git-xargs; do
     check_cmd "$c"
 done
 
