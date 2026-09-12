@@ -229,6 +229,44 @@ Same as the VM case — steps 1-5, no changes. This is the most direct
 path: no virtualization layer, no WSL translation layer, just Debian and
 Nix.
 
+### macOS
+
+This flake genuinely supports macOS (`x86_64-darwin`/`aarch64-darwin` are
+both in `flake.nix`'s `systems` list and get their own `homeConfigurations`
+and CI checks, not just Linux) - it's just been undocumented until now.
+
+Nix's own installer (step 2 above) supports macOS the same way, both
+Apple Silicon and Intel:
+
+```console
+$ sh <(curl -L https://nixos.org/nix/install)
+```
+
+Follow steps 3-6 above with **one change**: `default` specifically aliases
+`x86_64-linux` (see `flake.nix`) - on macOS, use your actual system
+instead of `default` everywhere a command references it:
+
+```console
+$ nix build .#homeConfigurations.aarch64-darwin.activationPackage   # Apple Silicon
+$ nix build .#homeConfigurations.x86_64-darwin.activationPackage    # Intel
+$ ./result/activate
+$ home-manager switch --flake .#aarch64-darwin   # subsequent activations
+```
+
+`home.homeDirectory` is already `/Users/workspace` on Darwin (`flake.nix`
+handles this per-system). A small number of pieces are Linux-only by
+nature (container sandboxing - `init-firewall`/`oci-image-sandboxed` - and
+any tool nixpkgs itself restricts to Linux) and are already excluded from
+Darwin builds at the flake level; everything else works the same.
+
+### Windows (native, without WSL2)
+
+Not supported, and can't be: Nix has no native Windows/NT port - it
+requires a POSIX-like kernel (Linux or Darwin) or WSL2's Linux kernel
+underneath. **WSL2 (above) is the only Windows path this flake
+supports** - it's real Linux, not an emulation layer, so everything in
+this README applies unchanged once you're inside it.
+
 ## Quickstart
 
 See [`specs/001-core-flake-home-manager/quickstart.md`](specs/001-core-flake-home-manager/quickstart.md)
@@ -362,6 +400,22 @@ $ pgpass url --conn-id=MYDB                    # postgres://user:pass@host:port/
 `--conn-id` takes an extended regex, so `--conn-id=".*"` matches every
 connection (useful with `env` to export every connection's variables at
 once, prefixed by each connection's own `id`).
+
+## Java toolchain
+
+Every profile installs a JDK (`java`) and Maven (`mvn`), with `JAVA_HOME`
+already set - no separate version manager needed.
+
+The original repo used SDKMAN! to install a JDK/Maven per-engineer,
+opt-in, via a `setup-java-amazon-corretto` fish function. This repo is
+already built on a real, pinned version manager - Nix itself - so a
+second one on top would just duplicate that job. If you need a different
+JDK version or vendor than the one nixpkgs pins here, override
+`home/java.nix`'s `pkgs.jdk`/`pkgs.maven` in a fork (e.g. `pkgs.temurin-bin`
+for a specific Temurin release), the same override pattern as every other
+opinionated default in this repo (git identity, the Nerd Font choice,
+etc.) - see `specs/015-java-toolchain/spec.md` for the exact packages
+this pins today.
 
 ## Keeping your sandbox in sync
 
