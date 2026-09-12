@@ -59,10 +59,12 @@
   };
 
   # Fish becomes the interactive shell for this profile without touching
-  # /etc/shells or /etc/passwd (which home-manager standalone mode cannot
-  # manage on its own) - engineers chsh into it themselves per
-  # quickstart.md, or it's set as the container/session entrypoint in
-  # Phase 2.
+  # /etc/shells or /etc/passwd here (home-manager standalone mode can't
+  # manage either on its own) - install.sh does that separately, as a
+  # best-effort `chsh` step once fish actually exists on disk (see its
+  # own comments for why), since a user's login shell isn't itself
+  # something Nix ever manages. It's the container/session entrypoint
+  # directly in Phase 2's OCI image instead.
 
   programs.oh-my-posh = {
     enable = true;
@@ -70,10 +72,26 @@
     # The exact theme from strategy-coach/workspaces-host
     # (dot_config/oh-my-posh/coach.omp.json), carried over byte-for-byte so
     # the default prompt styling matches the original repo this project
-    # succeeds, not a new placeholder theme.
+    # succeeds, not a new placeholder theme. `disable_notice` is merged
+    # in here rather than edited into that checked-in file, to keep its
+    # byte-for-byte provenance intact.
+    #
+    # This is `disable_notice`, not `auto_upgrade`: oh-my-posh's own
+    # binary here lives in the read-only Nix store, so a self-upgrade
+    # would either fail outright or, worse, silently write a new binary
+    # somewhere Nix doesn't know about and doesn't track - fighting the
+    # exact thing this whole repo exists to guarantee (Constitution
+    # Principle I: pinned by lockfile, not resolved against a mutable
+    # upstream at runtime). A newer oh-my-posh here means bumping this
+    # flake's nixpkgs pin, the same as any other tool - the update
+    # notice's CLI toggles (`oh-my-posh enable/disable notice`) are also
+    # reported unreliable upstream, so the config-file setting is used
+    # directly instead, per oh-my-posh's own FAQ.
     settings = builtins.fromJSON (
       builtins.unsafeDiscardStringContext
         (builtins.readFile ../themes/oh-my-posh/coach.omp.json)
-    );
+    ) // {
+      disable_notice = true;
+    };
   };
 }

@@ -158,9 +158,15 @@ titled "Debian"), except step 1.
    prompt icons" below. It's a couple of extra steps, and the prompt
    still works without it, just with plain boxes instead of icons.
 
-That's it - from now on, every new Debian/WSL window already has this
-setup active. To pick up future improvements to it, see "Keeping your
-sandbox in sync" below.
+That's it - **close this window and open a new one** (fish only becomes
+your actual login shell in a fresh window - step 4 already set it, but
+this one is still whatever you started in). From now on, every new
+Debian/WSL window already has this setup active. To pick up future
+improvements to it, see "Keeping your sandbox in sync" below.
+
+If a new window still starts in `bash` instead of `fish`, step 4's
+automatic `chsh` didn't succeed (a locked-down `/etc`, no `sudo`) -
+`doctor` will tell you, with the exact command to fix it yourself.
 
 **One habit worth having from day one**: always keep your project repos
 under `~/workspaces` (see "Managing your `~/workspaces` repos" below),
@@ -258,6 +264,37 @@ for you.
 - **Check it worked**: close and reopen your terminal window (font
   changes usually don't apply to windows already open) and look at your
   prompt - you should see actual icons, not boxes or `?` marks.
+
+### Using VS Code with this setup (WSL)
+
+This repo doesn't install VS Code itself - it's a personal choice, and
+on WSL specifically there's a right way to set it up that has nothing to
+do with this sandbox. If `code .` from inside your Debian window opens
+the **Windows** copy of VS Code (or errors instead of opening anything),
+that's WSL doing exactly what it's designed to do - Windows' own `code`
+launcher is on your `$PATH` inside WSL automatically, and Microsoft's
+own supported way to edit WSL files in VS Code is to let it do that:
+
+1. **Install VS Code on Windows** (not inside Debian) from
+   [code.visualstudio.com](https://code.visualstudio.com/), if you
+   haven't already.
+2. **Install the "WSL" extension** in that Windows VS Code (Extensions
+   sidebar, search "WSL", the one published by Microsoft).
+3. From inside your Debian window, in any project folder:
+   ```console
+   $ code .
+   ```
+   The first time, this installs a small VS Code Server *inside* WSL
+   (needs network access, takes a minute) and then opens a normal VS
+   Code window - editing, the integrated terminal, and any extension you
+   run all execute inside Linux/WSL, not Windows, even though the window
+   itself is a Windows application.
+
+If step 3 still fails after installing the WSL extension, it's almost
+always the VS Code Server install step - `code --version` from inside
+WSL after that first run will confirm whether it actually landed; if it
+didn't, closing and reopening the Debian window (fresh `$PATH`) before
+retrying `code .` resolves it in most cases.
 
 ### Other platforms (Linux or macOS, no WSL)
 
@@ -816,7 +853,8 @@ environment and shouldn't happen unattended.
 Run `doctor` (installed by every profile) to check that Nix, the shell
 stack, git, and every ported CLI tool are actually present and working -
 plus a set of checks aimed specifically at mistakes that are easy to
-make if you're new to Linux/WSL: whether
+make if you're new to Linux/WSL: whether fish actually ended up as your
+login shell (not just installed), whether
 `~/.config/workspaces-host/credentials` exists with the right
 permissions, GitHub/GitLab authentication (including via a token from
 that file), whether the AI harness CLIs (Claude Code, Codex, Gemini

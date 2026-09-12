@@ -158,6 +158,36 @@ nix build ".#homeConfigurations.${WORKSPACES_HOST_PROFILE}.activationPackage" --
 log "activating"
 ./result/activate
 
+# --- 7. Make fish the actual login shell (best-effort) ------------------
+# Home-manager standalone mode can't touch /etc/shells or /etc/passwd
+# itself, so without this step activation alone leaves $SHELL as
+# whatever it was before (bash, on a fresh Debian/WSL image) - fish only
+# ever runs if you type "fish" yourself, every single new window,
+# forever. `$HOME/.nix-profile/bin/fish` (not the raw /nix/store/...
+# path underneath it) is the right chsh target: home-manager repoints
+# that symlink atomically on every switch, so it keeps working across
+# nixpkgs upgrades instead of going stale the moment fish's store path
+# changes. Best-effort: a locked-down /etc (no sudo, a read-only
+# filesystem, centrally-managed accounts) shouldn't fail the whole
+# install - `fish` still works typed by hand either way, and `doctor`
+# checks this so it's never a silent gap.
+fish_path="$HOME/.nix-profile/bin/fish"
+if [ -x "$fish_path" ]; then
+    current_shell=$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)
+    if [ "$current_shell" != "$fish_path" ]; then
+        log "setting fish as your login shell"
+        if grep -qxF "$fish_path" /etc/shells 2>/dev/null || as_root sh -c "echo '$fish_path' >> /etc/shells" 2>/dev/null; then
+            if as_root chsh -s "$fish_path" "$USER" 2>/dev/null; then
+                log "done - open a new terminal window (or WSL window) to see it take effect"
+            else
+                log "couldn't change your login shell automatically - run 'chsh -s $fish_path' yourself, or just type 'fish' each new window"
+            fi
+        else
+            log "couldn't register fish in /etc/shells - run 'chsh -s $fish_path' yourself, or just type 'fish' each new window"
+        fi
+    fi
+fi
+
 log "done - open a new shell, then:"
 log "  1. edit $credentials_file (your name/email, tokens, API keys) and run 'workspaces-host-update' to apply it - see README's 'Setting up your credentials' section"
 log "  2. run 'doctor' to verify everything"

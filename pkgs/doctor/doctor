@@ -57,6 +57,21 @@ if command -v direnv >/dev/null 2>&1; then
         warn "nix-direnv integration file not found (did home-manager switch run?)"
     fi
 fi
+if command -v fish >/dev/null 2>&1 && command -v getent >/dev/null 2>&1; then
+    fish_path="$HOME/.nix-profile/bin/fish"
+    login_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
+    # $SHELL only reflects whatever shell you're actually running right
+    # now (bash, if you're reading doctor's output from one you opened
+    # before fish became your login shell, or ran doctor from inside a
+    # manually-typed `fish` without ever chsh-ing) - /etc/passwd's own
+    # field is the only reliable source for "what will a brand-new
+    # window actually start in."
+    if [ "$login_shell" = "$fish_path" ]; then
+        pass "fish is your login shell"
+    else
+        warn "your login shell is $login_shell, not fish ($fish_path) - install.sh tries to set this automatically and may have failed (a locked-down /etc, no sudo); fix it yourself with 'chsh -s $fish_path', or just type 'fish' each new window"
+    fi
+fi
 
 echo
 echo "-- Git --"
