@@ -15,3 +15,7 @@ result-*
 # agents may cache locally under .claude/.
 .claude/settings.local.json
 .claude/*.local.json
+
+# Claude Code background-agent isolated git worktrees - session-local
+# scratch state, never part of this project.
+.claude/worktrees/
