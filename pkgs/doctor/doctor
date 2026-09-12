@@ -162,6 +162,20 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
         pass "\$HOME is on the Linux filesystem, not a slower /mnt/* Windows mount"
         ;;
     esac
+    # A correct $HOME doesn't guarantee every actual repo does too - the
+    # WSL "I/O intensive operation like git" slowness warning happens
+    # wherever you're actually standing when you run git, which is just
+    # as often a project manually cloned/opened under /mnt/c (a habit
+    # left over from before WSL, or a folder opened straight from
+    # Windows Explorer) as it is a misconfigured $HOME.
+    case "$PWD" in
+    /mnt/*)
+        warn "the current directory ($PWD) is under /mnt - that's the Windows filesystem from inside WSL, which is exactly what makes git (and other I/O-heavy commands) slow here; 'mgit ensure' clones repos under ~/workspaces (the Linux filesystem) instead - move or re-clone this one there"
+        ;;
+    *)
+        pass "the current directory is on the Linux filesystem, not a slower /mnt/* Windows mount"
+        ;;
+    esac
 fi
 
 if command -v df >/dev/null 2>&1; then

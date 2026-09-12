@@ -162,6 +162,14 @@ That's it - from now on, every new Debian/WSL window already has this
 setup active. To pick up future improvements to it, see "Keeping your
 sandbox in sync" below.
 
+**One habit worth having from day one**: always keep your project repos
+under `~/workspaces` (see "Managing your `~/workspaces` repos" below),
+not under `/mnt/c/Users/...`. WSL can access Windows' files from Linux
+and vice versa, but it's slow across that boundary - git especially -
+and it's exactly what a WSL warning about "an I/O intensive operation
+like git" is telling you if you ever see one. `doctor` checks for this
+too.
+
 ### What the installer actually does (manual steps, if you'd rather)
 
 Everything `install.sh` does, spelled out - useful if you want to run it
@@ -544,6 +552,25 @@ folder layout under `~/workspaces`. Every profile installs the `mgit`
 command and creates `~/workspaces` automatically on activation - there's
 nothing extra to install to get your repos organized.
 
+**On WSL, this also matters for speed, not just organization.**
+`~/workspaces` sits on the Linux filesystem WSL runs on natively - the
+same reason `doctor` checks that `$HOME` isn't under `/mnt`. Windows and
+Linux talk to each other's filesystems through a translation layer that
+adds real overhead to every single file access, and git is exactly the
+kind of tool that touches a lot of files quickly - so a repo cloned or
+opened under `/mnt/c/Users/...` (the Windows-side filesystem, as seen
+from inside WSL) can make ordinary git commands feel sluggish enough
+that WSL itself will sometimes warn you about it directly. If you ever
+see a warning like *"using an I/O intensive operation like git in
+WSL..."*, check where you actually are:
+```console
+$ pwd
+```
+If it starts with `/mnt/`, that's the cause - move the repo under
+`~/workspaces` instead (or just re-clone it there with `mgit`, below)
+and the slowness goes away. `doctor` checks this too, for both `$HOME`
+and whatever directory you happen to run it from.
+
 ### The governed directory convention
 
 Every repo `mgit` manages lives at
@@ -795,9 +822,10 @@ permissions, GitHub/GitLab authentication (including via a token from
 that file), whether the AI harness CLIs (Claude Code, Codex, Gemini
 CLI, aider, GitHub Copilot CLI) are installed and have a credential to
 use, SSH key existence and permissions, working under WSL's slower
-`/mnt/c` Windows filesystem by mistake, low disk space, a misconfigured
-locale, a plaintext `~/.netrc` with the wrong permissions, an overly
-permissive `umask`, and Docker group membership:
+`/mnt/c` Windows filesystem by mistake (both `$HOME` and wherever
+you're currently standing), low disk space, a misconfigured locale, a
+plaintext `~/.netrc` with the wrong permissions, an overly permissive
+`umask`, and Docker group membership:
 
 ```console
 $ doctor
