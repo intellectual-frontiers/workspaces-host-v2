@@ -156,34 +156,46 @@ cd "$WORKSPACES_HOST_REPO"
 log "building $WORKSPACES_HOST_PROFILE (downloads everything needed - can take a few minutes the first time)"
 nix build ".#homeConfigurations.${WORKSPACES_HOST_PROFILE}.activationPackage" --impure
 log "activating"
+# A brand-new account already has its own ~/.bashrc/~/.profile (Debian's
+# own skeleton files, copied into every new user's home directory by
+# useradd/adduser) - ordinary files, not symlinks, so home-manager
+# safely refuses to overwrite them by default rather than silently
+# discarding whatever's there. HOME_MANAGER_BACKUP_EXT makes it move
+# them aside first instead of failing - the exact mechanism
+# `home-manager switch -b` uses, available here too since install.sh
+# talks to the lower-level activation script directly.
+export HOME_MANAGER_BACKUP_EXT="pre-workspaces-host-backup"
 ./result/activate
 
-# --- 7. Make fish the actual login shell (best-effort) ------------------
+# --- 7. Make this repo's own bash the actual login shell (best-effort) -
 # Home-manager standalone mode can't touch /etc/shells or /etc/passwd
-# itself, so without this step activation alone leaves $SHELL as
-# whatever it was before (bash, on a fresh Debian/WSL image) - fish only
-# ever runs if you type "fish" yourself, every single new window,
-# forever. `$HOME/.nix-profile/bin/fish` (not the raw /nix/store/...
+# itself, so without this step activation alone leaves the login shell
+# as whatever it was before - usually already /bin/bash on a fresh
+# Debian/WSL image, but the *system's* bash, not this flake's pinned
+# one, so engineers on different machines could silently be running
+# different bash versions/builds despite everything else here being
+# identical. `$HOME/.nix-profile/bin/bash` (not the raw /nix/store/...
 # path underneath it) is the right chsh target: home-manager repoints
 # that symlink atomically on every switch, so it keeps working across
-# nixpkgs upgrades instead of going stale the moment fish's store path
+# nixpkgs upgrades instead of going stale the moment bash's store path
 # changes. Best-effort: a locked-down /etc (no sudo, a read-only
 # filesystem, centrally-managed accounts) shouldn't fail the whole
-# install - `fish` still works typed by hand either way, and `doctor`
-# checks this so it's never a silent gap.
-fish_path="$HOME/.nix-profile/bin/fish"
-if [ -x "$fish_path" ]; then
+# install - the system's own bash still works exactly the same either
+# way (this repo's config lives in ~/.bashrc, read by any bash), and
+# `doctor` checks this so it's never a silent gap.
+bash_path="$HOME/.nix-profile/bin/bash"
+if [ -x "$bash_path" ]; then
     current_shell=$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)
-    if [ "$current_shell" != "$fish_path" ]; then
-        log "setting fish as your login shell"
-        if grep -qxF "$fish_path" /etc/shells 2>/dev/null || as_root sh -c "echo '$fish_path' >> /etc/shells" 2>/dev/null; then
-            if as_root chsh -s "$fish_path" "$USER" 2>/dev/null; then
+    if [ "$current_shell" != "$bash_path" ]; then
+        log "setting this repo's pinned bash as your login shell"
+        if grep -qxF "$bash_path" /etc/shells 2>/dev/null || as_root sh -c "echo '$bash_path' >> /etc/shells" 2>/dev/null; then
+            if as_root chsh -s "$bash_path" "$USER" 2>/dev/null; then
                 log "done - open a new terminal window (or WSL window) to see it take effect"
             else
-                log "couldn't change your login shell automatically - run 'chsh -s $fish_path' yourself, or just type 'fish' each new window"
+                log "couldn't change your login shell automatically - run 'chsh -s $bash_path' yourself if you want the exact same bash version as everyone else on this setup"
             fi
         else
-            log "couldn't register fish in /etc/shells - run 'chsh -s $fish_path' yourself, or just type 'fish' each new window"
+            log "couldn't register $bash_path in /etc/shells - run 'chsh -s $bash_path' yourself if you want the exact same bash version as everyone else on this setup"
         fi
     fi
 fi

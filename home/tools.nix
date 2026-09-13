@@ -25,8 +25,25 @@ in
     jq
     bat
     eza
-    fzf
     gitleaks
+    # A few more modern, Rust-based replacements for classic CLI tools -
+    # available under their own names (nothing here is aliased over a
+    # POSIX builtin except `ls`/`cat`, in home/shell.nix's
+    # shellAliases), so tutorials/scripts using the originals keep
+    # working, while anyone who wants the nicer version just has to type
+    # its name once to discover it exists.
+    bottom # `btm` - a friendlier top/htop, no config needed to be useful
+    du-dust # `dust` - du, but shows what's actually taking up space at a glance
+    tealdeer # `tldr` - short, example-driven command help instead of a full man page
+    # a terminal multiplexer with a visible on-screen keybinding hint
+    # bar - much more discoverable than tmux's own for anyone who's
+    # never used either
+    zellij
+    # bash's own syntax-highlighting/autosuggestion engine (see
+    # home/shell.nix) - listed here too so `blesh-share`/`ble-update` are
+    # on PATH for manual use, not just the one file shell.nix sources
+    # directly by store path
+    blesh
     # `ssh`/`ssh-keygen` - most base OS images already have these, but
     # this repo doesn't rely on that: `doctor`'s SSH-key check (pkgs/doctor)
     # tells engineers to run `ssh-keygen` if they don't have one, so the

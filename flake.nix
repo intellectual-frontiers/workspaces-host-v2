@@ -1,5 +1,5 @@
 {
-  description = "Workspaces Host v2 - core flake: home-manager module (fish, oh-my-posh, direnv, git), ported CLI tools, per-persona profiles, and an OCI image built from the same closure";
+  description = "Workspaces Host v2 - core flake: home-manager module (bash, oh-my-posh, direnv, git), ported CLI tools, per-persona profiles, and an OCI image built from the same closure";
 
   inputs = {
     nixpkgs.url = "git+https://github.com/NixOS/nixpkgs?ref=nixos-24.11&shallow=1";

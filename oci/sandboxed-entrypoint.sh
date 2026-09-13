@@ -13,7 +13,7 @@ else
 fi
 
 if [ $# -eq 0 ]; then
-    set -- fish
+    set -- bash -l
 fi
 
 exec setpriv --reuid=agent --regid=agent --clear-groups --inh-caps=-all "$@"

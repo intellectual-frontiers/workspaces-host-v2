@@ -14,49 +14,44 @@ let
   # unscoped") is explicit and non-negotiable: a credential MUST be
   # resolved "at the point of use," never as an ambient variable
   # available to the whole shell session. So instead of exporting a
-  # configured key into every interactive shell (which is what an
-  # earlier version of this file did, and which a Nix-conformance/
-  # constitution audit correctly flagged as a real violation), each
-  # known AI CLI gets a fish function of the same name that:
-  #   1. looks for a decrypted secret file matching one of its known
-  #      credential variable names,
-  #   2. if found, sets it with `set -lx` - fish's function-scoped,
-  #      exported variable, visible to this one invocation's child
-  #      process and automatically gone once the function returns, never
-  #      leaking into the parent shell - and
-  #   3. calls `command <name> $argv` (bypassing this very function) to
+  # configured key into every interactive shell, each known CLI gets a
+  # bash function of the same name that:
+  #   1. `local`-declares each of its known credential variable names -
+  #      at the *function's* scope, not inside the `for` loop below (a
+  #      `local` declared inside a `for`/`if`/`while` block in bash is
+  #      still function-scoped, unlike fish's block-scoped `-l`/`-lx` -
+  #      verified for real, not assumed, since fish's own equivalent
+  #      here had a genuine scoping bug caught the same way),
+  #   2. looks for a decrypted secret file matching one of those names,
+  #      and if found, `export`s it - which updates the already-`local`
+  #      variable in place rather than creating a new global, since
+  #      bash resolves a dynamically-constructed `export "$var=..."`
+  #      assignment by name exactly the same as a literal one - and
+  #   3. calls `command <name> "$@"` (bypassing this very function) to
   #      run the real binary, however it was installed (`npm install -g`
   #      or a Nix package).
-  # If no matching secret is configured, this is a transparent no-op
-  # pass-through - a CLI's own browser-based `login` flow (or `gh`/
-  # `glab`'s own stored auth, or an already-set env var from outside)
-  # works exactly as if this wrapper didn't exist.
+  # Once the function returns, every one of these variables - local to
+  # it - is gone; nothing leaks into the interactive shell that called
+  # it. If no matching secret is configured, this is a transparent
+  # no-op pass-through - a CLI's own browser-based `login` flow (or
+  # `gh`/`glab`'s own stored auth, or an already-set env var from
+  # outside) works exactly as if this wrapper didn't exist.
   wrapCli = name: varNames:
     let
-      # Fish scopes `set -l`/`-lx` to the *innermost enclosing block* -
-      # a `for` loop is its own block, so a variable set with `-lx`
-      # inside one is destroyed the moment the loop ends, before
-      # `command <name>` below ever runs (verified: an earlier version
-      # of this wrapper set the variable successfully but the spawned
-      # process never saw it - a real, empirically-confirmed fish
-      # scoping bug, not a hypothetical one). Pre-declaring each
-      # candidate variable at the function's own top-level scope first,
-      # then assigning to it with a bare `set` (no `-l`) inside the
-      # loop, makes fish update that already-declared function-scoped
-      # variable in place instead of shadowing it inside the loop's
-      # block - so it's still alive, and still exported, when `command`
-      # runs, and still gone the moment this function returns.
-      predeclare = lib.concatMapStringsSep "\n" (v: "set -lx ${v} \"\"") varNames;
+      predeclare = lib.concatMapStringsSep "\n" (v: "    local ${v}") varNames;
+      varList = lib.concatStringsSep " " varNames;
     in
     ''
-      ${predeclare}
-      for var in ${lib.concatStringsSep " " varNames}
-        set -l f "${secretsEnvDir}/$var"
-        if test -f "$f"
-          set $var (cat "$f")
-        end
-      end
-      command ${name} $argv
+      ${name}() {
+    ${predeclare}
+        for var in ${varList}; do
+          f="${secretsEnvDir}/$var"
+          if [ -f "$f" ]; then
+            export "$var=$(cat "$f")"
+          fi
+        done
+        command ${name} "$@"
+      }
     '';
 in
 {
@@ -91,12 +86,14 @@ in
   # scoped to just that one invocation, never the whole shell - the same
   # mechanism, just applied to two more tools that read a token the same
   # way an AI CLI reads an API key.
-  programs.fish.functions = {
-    claude = wrapCli "claude" [ "ANTHROPIC_API_KEY" ];
-    codex = wrapCli "codex" [ "OPENAI_API_KEY" ];
-    gemini = wrapCli "gemini" [ "GEMINI_API_KEY" "GOOGLE_API_KEY" ];
-    aider = wrapCli "aider" [ "ANTHROPIC_API_KEY" "OPENAI_API_KEY" "GEMINI_API_KEY" "GOOGLE_API_KEY" ];
-    gh = wrapCli "gh" [ "GITHUB_TOKEN" "GH_TOKEN" ];
-    glab = wrapCli "glab" [ "GITLAB_TOKEN" ];
-  };
+  programs.bash.initExtra = lib.concatStrings (map
+    ({ name, vars }: wrapCli name vars)
+    [
+      { name = "claude"; vars = [ "ANTHROPIC_API_KEY" ]; }
+      { name = "codex"; vars = [ "OPENAI_API_KEY" ]; }
+      { name = "gemini"; vars = [ "GEMINI_API_KEY" "GOOGLE_API_KEY" ]; }
+      { name = "aider"; vars = [ "ANTHROPIC_API_KEY" "OPENAI_API_KEY" "GEMINI_API_KEY" "GOOGLE_API_KEY" ]; }
+      { name = "gh"; vars = [ "GITHUB_TOKEN" "GH_TOKEN" ]; }
+      { name = "glab"; vars = [ "GITLAB_TOKEN" ]; }
+    ]);
 }

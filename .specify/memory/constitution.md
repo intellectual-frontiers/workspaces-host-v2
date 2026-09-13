@@ -58,8 +58,13 @@ spans several PRs merged in sequence.
   reintroduced; where the old repository used one of them, the
   replacement is a flake input or home-manager module, not a port of the
   original tool.
-- **Shell UX**: Fish is the default interactive shell, with oh-my-posh for
-  the prompt, configured via home-manager rather than dotfile templating.
+- **Shell UX**: bash is the default interactive shell (amended
+  2026-09-13; fish originally) - chosen so nothing copy-pasted from
+  elsewhere ever needs translating, at the deliberate cost of needing
+  extra tooling (`ble.sh`, `fzf`, `zoxide`) layered on top for the
+  interactive conveniences fish had natively. oh-my-posh remains the
+  prompt, and everything here (bash config, the added tooling, the
+  prompt) is configured via home-manager rather than dotfile templating.
 - **Per-project env scoping**: direnv with `nix-direnv` is the standard
   mechanism for project-local environment and secret scoping.
 - **OCI builds**: container images are built from the same flake outputs
@@ -90,4 +95,4 @@ the amending PR's description. Complexity that cannot be justified against
 these principles (in particular Principles I, II, and V) is grounds for
 requesting changes in review.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-11 | **Last Amended**: 2026-09-11
+**Version**: 1.1.0 | **Ratified**: 2026-09-11 | **Last Amended**: 2026-09-13

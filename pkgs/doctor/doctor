@@ -47,9 +47,11 @@ check_cmd home-manager
 
 echo
 echo "-- Shell / prompt / direnv --"
-check_cmd fish
+check_cmd bash
 check_cmd oh-my-posh
 check_cmd direnv
+check_cmd zoxide
+check_cmd fzf
 if command -v direnv >/dev/null 2>&1; then
     if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/direnv/lib/hm-nix-direnv.sh" ]; then
         pass "nix-direnv integration file present"
@@ -57,19 +59,23 @@ if command -v direnv >/dev/null 2>&1; then
         warn "nix-direnv integration file not found (did home-manager switch run?)"
     fi
 fi
-if command -v fish >/dev/null 2>&1 && command -v getent >/dev/null 2>&1; then
-    fish_path="$HOME/.nix-profile/bin/fish"
+if [ -f "$HOME/.bashrc" ] && grep -q "blesh" "$HOME/.bashrc" 2>/dev/null; then
+    pass "blesh (bash syntax highlighting/autosuggestions) is wired into ~/.bashrc"
+else
+    warn "blesh doesn't appear to be wired into ~/.bashrc (did home-manager switch run?)"
+fi
+if command -v getent >/dev/null 2>&1; then
+    bash_path="$HOME/.nix-profile/bin/bash"
     login_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
     # $SHELL only reflects whatever shell you're actually running right
-    # now (bash, if you're reading doctor's output from one you opened
-    # before fish became your login shell, or ran doctor from inside a
-    # manually-typed `fish` without ever chsh-ing) - /etc/passwd's own
-    # field is the only reliable source for "what will a brand-new
-    # window actually start in."
-    if [ "$login_shell" = "$fish_path" ]; then
-        pass "fish is your login shell"
+    # now (the system's own /bin/bash, if you're reading doctor's
+    # output from a window opened before install.sh's chsh step ran) -
+    # /etc/passwd's own field is the only reliable source for "what
+    # will a brand-new window actually start in."
+    if [ "$login_shell" = "$bash_path" ]; then
+        pass "this flake's own pinned bash ($bash_path) is your login shell"
     else
-        warn "your login shell is $login_shell, not fish ($fish_path) - install.sh tries to set this automatically and may have failed (a locked-down /etc, no sudo); fix it yourself with 'chsh -s $fish_path', or just type 'fish' each new window"
+        warn "your login shell is $login_shell, not this flake's pinned bash ($bash_path) - install.sh tries to set this automatically and may have failed (a locked-down /etc, no sudo); fix it yourself with 'chsh -s $bash_path' if you want the exact same bash version as everyone else on this setup"
     fi
 fi
 
@@ -89,6 +95,13 @@ if command -v git >/dev/null 2>&1; then
         pass "git user.email is set ($email)"
         ;;
     esac
+    if command -v delta >/dev/null 2>&1; then
+        if git config --get core.pager 2>/dev/null | grep -q delta; then
+            pass "delta is wired in as git's diff pager"
+        else
+            warn "delta is installed but not set as git's pager (did home-manager switch run?)"
+        fi
+    fi
 fi
 
 echo
@@ -255,7 +268,7 @@ check_ai_cli() {
     pass "$label is on PATH ($(command -v "$cli"))"
     # Credentials for these CLIs are deliberately NOT ambient env vars
     # (Constitution Principle III - resolved at the point of use only,
-    # via a per-CLI fish wrapper in home/ai-harness.nix), so check for
+    # via a per-CLI bash wrapper function in home/ai-harness.nix), so check for
     # the secret file the wrapper reads, not $VARNAME itself - an
     # already-exported $VARNAME (e.g. from a project's own .envrc) still
     # counts too.

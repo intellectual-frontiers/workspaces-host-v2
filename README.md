@@ -66,8 +66,10 @@ CI run, and every agent) who uses this setup after that.
 
 ## What you get
 
-- A configured shell and prompt (fish + oh-my-posh) that looks and
-  behaves the same on every machine you use it on.
+- A configured shell and prompt (bash + oh-my-posh, plus syntax
+  highlighting/autosuggestions, fuzzy history/file search, and smarter
+  `cd` - see "Your shell" below) that looks and behaves the same on
+  every machine you use it on.
 - Git and database credentials handled safely by default, with a simple,
   documented way to update them from the command line (see "Updating
   your Git identity, and other secrets, from the CLI" below).
@@ -158,14 +160,16 @@ titled "Debian"), except step 1.
    prompt icons" below. It's a couple of extra steps, and the prompt
    still works without it, just with plain boxes instead of icons.
 
-That's it - **close this window and open a new one** (fish only becomes
-your actual login shell in a fresh window - step 4 already set it, but
-this one is still whatever you started in). From now on, every new
-Debian/WSL window already has this setup active. To pick up future
-improvements to it, see "Keeping your sandbox in sync" below.
+That's it - **close this window and open a new one** (step 4 already
+set your login shell, but this window is still whatever you started in
+- and since it's bash either way, the change is easy to miss at a
+glance; look for the new prompt and for autosuggestions appearing as
+you type to confirm it took). From now on, every new Debian/WSL window
+already has this setup active. To pick up future improvements to it,
+see "Keeping your sandbox in sync" below.
 
-If a new window still starts in `bash` instead of `fish`, step 4's
-automatic `chsh` didn't succeed (a locked-down `/etc`, no `sudo`) -
+If a new window doesn't look/feel any different, step 4's automatic
+`chsh` may not have succeeded (a locked-down `/etc`, no `sudo`) -
 `doctor` will tell you, with the exact command to fix it yourself.
 
 **One habit worth having from day one**: always keep your project repos
@@ -195,6 +199,7 @@ $ echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
 $ git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git ~/.workspaces-host-v2
 $ cd ~/.workspaces-host-v2
 $ nix build .#homeConfigurations.current.activationPackage --impure
+$ export HOME_MANAGER_BACKUP_EXT=pre-workspaces-host-backup
 $ ./result/activate
 $ mkdir -p ~/.config/workspaces-host
 $ cp ~/.workspaces-host-v2/credentials.example ~/.config/workspaces-host/credentials
@@ -207,6 +212,11 @@ The leading `.` in `.workspaces-host-v2` just keeps it out of a plain
 normally insists everything be fully self-contained (no reading your
 actual username), so this one flag is how you tell it "yes, really use my
 real account" instead of a placeholder one.
+`HOME_MANAGER_BACKUP_EXT` renames your account's pre-existing
+`~/.bashrc`/`~/.profile` (Debian gives every new account these by
+default) to `~/.bashrc.pre-workspaces-host-backup` etc. instead of
+activation failing outright because they're in the way - safe to delete
+those backups once you've confirmed everything works the way you expect.
 
 `install.sh` (in this repo) is the actual source of truth for these
 steps - if it and this section ever disagree, trust the script; both are
@@ -552,9 +562,9 @@ ANTHROPIC_API_KEY=sk-ant-yourRealKey
 This project's own constitution is explicit that a secret must never
 become "an ambient environment variable available to an entire shell
 session" - so instead of exporting your key into every shell,
-`claude`/`codex`/`gemini`/`aider`/`gh`/`glab` each get their own fish
-wrapper function (`home/ai-harness.nix`) that looks for their matching
-key and sets it only for that one invocation. Run `claude` afterward and
+`claude`/`codex`/`gemini`/`aider`/`gh`/`glab` each get their own bash
+function of the same name (`home/ai-harness.nix`) that looks for their
+matching key and sets it only for that one invocation. Run `claude` afterward and
 its wrapper finds the value `workspaces-host-update` wrote, sets
 `$ANTHROPIC_API_KEY` only for that one call, and never touches the rest
 of your shell - `echo $ANTHROPIC_API_KEY` in the same window stays
@@ -575,6 +585,84 @@ beyond your own machine (a new tool, a better default, another `doctor`
 check), open a pull request against this repository with it instead of
 only keeping the change local - see "Why this exists" above for why
 that matters here specifically.
+
+## Your shell
+
+This setup uses **bash**, not a different shell like fish or zsh - on
+purpose: it's what every tutorial, every Stack Overflow answer, and
+every other Linux/WSL machine you'll ever touch already assumes, so
+nothing you copy-paste from anywhere else needs translating first. But
+plain bash on its own is missing a few things fish is well known for -
+so those are added on top, not left out:
+
+- **Syntax highlighting and autosuggestions as you type**
+  ([`ble.sh`](https://github.com/akinomyoga/ble.sh)) - commands color differently
+  depending on whether they're valid, and a suggestion based on your
+  history appears in gray as you type; press `→` (right arrow) or `End`
+  to accept it, exactly like fish.
+- **Fuzzy history and file search** ([`fzf`](https://github.com/junegunn/fzf)) -
+  `Ctrl+R` fuzzy-searches your command history (instead of bash's
+  default step-through search), `Ctrl+T` fuzzy-finds a file to insert
+  at the cursor, `Alt+C` fuzzy-finds a directory and `cd`s into it. All
+  three use `fd` under the hood, so they skip `.git`/`node_modules`/build
+  output automatically.
+- **Smarter directory jumping** ([`zoxide`](https://github.com/ajeetdsouza/zoxide)) -
+  `z <part of a path you've visited before>` jumps there by how often
+  and how recently you've been there, without typing the full path;
+  `zi` does the same with a fuzzy picker if more than one place matches.
+  This is deliberately a separate command, not a replacement for `cd`
+  itself - `cd` keeps doing exactly what it's always done, which matters
+  if you're still learning what it does.
+- **oh-my-posh**, same as before, just with its own upgrade nag turned
+  off (see "Why not `oh-my-posh enable autoupgrade`?" below).
+
+None of this changes what a plain `bash` script does, or what running
+this setup non-interactively (CI, a script, `bash -c '...'`) looks like -
+it's purely additive to the interactive, type-things-and-press-Enter
+experience.
+
+### Modern replacements for everyday CLI tools
+
+All available under their own names - nothing here is silently aliased
+over the classic tool except `ls`/`cat` (see below), so anything you've
+already learned, or copy-paste from elsewhere, keeps working exactly as
+written:
+
+| Instead of | Try | What's different |
+| --- | --- | --- |
+| `ls` | `eza` | colorized, git-status-aware, tree view (`eza --tree`) |
+| `cat` | `bat` | syntax highlighting, git diff markers in the margin |
+| `grep` | `rg` (ripgrep) | much faster, skips `.gitignore`d files automatically |
+| `find` | `fd` | simpler syntax, faster, also skips `.gitignore`d files |
+| `du` | `dust` | shows what's actually taking up space, at a glance |
+| `top`/`htop` | `btm` (bottom) | no configuration needed to be useful |
+| `man` | `tldr` | short, example-driven usage instead of a full manual |
+| `tmux`/`screen` | `zellij` | shows its own keybindings on-screen - nothing to memorize first |
+| `git diff`/`log -p` | (automatic) | `delta` is already wired in as git's pager - just run `git diff` |
+
+`ll` and `ls` are aliased to `eza` (`ll` adds `-lah --git`, showing
+per-file git status), and `cat` is aliased to `bat --paging=never` (so
+it still just dumps to your terminal like `cat` always has, with syntax
+highlighting added, rather than opening a pager). `grep`/`find`/`du`/`top`
+are deliberately left alone - their modern replacements use different
+enough flags that aliasing over them would break muscle memory and
+copy-pasted commands more than it would help; try `rg`/`fd`/`dust`/`btm`
+by name whenever you'd normally reach for the originals.
+
+### Why not `oh-my-posh enable autoupgrade`?
+
+It might seem like the obvious fix for the "a new release of oh-my-posh
+is available" message every profile used to show - but oh-my-posh's own
+binary here lives in the read-only Nix store, so a self-upgrade would
+either fail outright trying to overwrite it, or (worse) succeed by
+writing a new binary somewhere Nix has no record of - directly
+undermining the one guarantee this whole repository exists to provide
+(every tool pinned by a lockfile, not resolved against a mutable
+upstream at runtime). The message itself is silenced correctly instead
+(`disable_notice` in oh-my-posh's own config, home/shell.nix) - a purely
+cosmetic setting, not a version change. Want a newer oh-my-posh for
+everyone? That's a nixpkgs pin bump in this flake, the same as updating
+any other tool here.
 
 ## Quickstart
 
@@ -833,7 +921,7 @@ either in a fork or via `home.sessionVariables` if you need to):
 
 ### The nudge (so you actually remember to)
 
-Every profile's fish config checks, once per day, in the background
+Every profile's bash config checks, once per day, in the background
 (never blocking shell startup, and silently skipped if there's no
 network), whether `$WORKSPACES_HOST_REPO`'s `origin/main` has moved. If
 it has, your next new shell prints:
@@ -853,8 +941,8 @@ environment and shouldn't happen unattended.
 Run `doctor` (installed by every profile) to check that Nix, the shell
 stack, git, and every ported CLI tool are actually present and working -
 plus a set of checks aimed specifically at mistakes that are easy to
-make if you're new to Linux/WSL: whether fish actually ended up as your
-login shell (not just installed), whether
+make if you're new to Linux/WSL: whether this flake's own pinned bash
+actually ended up as your login shell (not just installed), whether
 `~/.config/workspaces-host/credentials` exists with the right
 permissions, GitHub/GitLab authentication (including via a token from
 that file), whether the AI harness CLIs (Claude Code, Codex, Gemini

@@ -12,6 +12,7 @@
 let
   cfg = homeConfig.config;
   configFile = name: cfg.xdg.configFile.${name}.source;
+  dotfile = name: cfg.home.file.${name}.source;
 
   passwd = pkgs.writeTextDir "etc/passwd" ''
     root:x:0:0::/root:/bin/sh
@@ -54,8 +55,10 @@ pkgs.dockerTools.buildLayeredImage {
   ]);
 
   extraCommands = ''
-    mkdir -p home/agent/.config/fish home/agent/.config/git home/agent/.config/oh-my-posh home/agent/.config/direnv/lib root tmp
-    cp ${configFile "fish/config.fish"} home/agent/.config/fish/config.fish
+    mkdir -p home/agent/.config/git home/agent/.config/oh-my-posh home/agent/.config/direnv/lib root tmp
+    cp ${dotfile ".bashrc"} home/agent/.bashrc
+    cp ${dotfile ".bash_profile"} home/agent/.bash_profile
+    cp ${dotfile ".profile"} home/agent/.profile
     cp ${configFile "git/config"} home/agent/.config/git/config
     cp ${configFile "oh-my-posh/config.json"} home/agent/.config/oh-my-posh/config.json
     cp ${configFile "direnv/lib/hm-nix-direnv.sh"} home/agent/.config/direnv/lib/hm-nix-direnv.sh

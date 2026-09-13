@@ -35,6 +35,21 @@
       core.editor = "vim";
     };
 
+    # A prettier `git diff`/`git show`/`git log -p` pager - side-by-side
+    # hunks, syntax highlighting, line numbers - with zero learning curve:
+    # it's a pager, not a new command to remember, so every existing git
+    # workflow/alias/muscle memory below is unaffected. Wired via
+    # home-manager's own dedicated `delta` integration (sets
+    # `core.pager`/`interactive.diffFilter` correctly, installs the
+    # package) rather than hand-rolled `extraConfig`.
+    delta = {
+      enable = true;
+      options = {
+        navigate = true;
+        line-numbers = true;
+      };
+    };
+
     aliases = {
       st = "status -sb";
       co = "checkout";

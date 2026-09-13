@@ -25,7 +25,7 @@ if [ ! -d "$REPO/.git" ]; then
 workspaces-host-update: no git repo at $REPO
 
 Set WORKSPACES_HOST_REPO to wherever you cloned workspaces-host-v2 (e.g.
-in your fish config: set -gx WORKSPACES_HOST_REPO ~/path/to/workspaces-host-v2),
+in your bash config: export WORKSPACES_HOST_REPO=~/path/to/workspaces-host-v2),
 or clone it to the default location:
   git clone https://github.com/intellectual-frontiers/workspaces-host-v2.git "$REPO"
 EOF
